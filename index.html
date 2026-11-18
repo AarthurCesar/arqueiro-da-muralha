@@ -239,12 +239,16 @@ function mkArcher(col,hairCol){const g=new THREE.Group(),L=c=>new THREE.MeshLamb
     const w=new THREE.Mesh(new THREE.SphereGeometry(.022,6,4),L(0xffffff));w.position.set(x+.02,.025,.42);head.add(w);}
   const hood=new THREE.Mesh(new THREE.SphereGeometry(.44,16,12),cloth);hood.position.set(0,.07,-.15);head.add(hood);
   const rim=new THREE.Mesh(new THREE.TorusGeometry(.33,.06,8,20),cloth);rim.position.set(0,.03,.2);rim.scale.set(1,1.1,1);head.add(rim);
-  const tip=new THREE.Mesh(new THREE.ConeGeometry(.24,.42,10),cloth);tip.position.set(0,.42,-.28);tip.rotation.x=-.5;head.add(tip);
+  const tip=new THREE.Mesh(new THREE.ConeGeometry(.3,.55,12),cloth);tip.position.set(0,.4,-.2);tip.rotation.x=-.35;head.add(tip);
+  const drape=new THREE.Mesh(new THREE.CylinderGeometry(.3,.42,.5,12,1,true,Math.PI*.5,Math.PI),cloth);drape.material.side=THREE.DoubleSide;drape.position.set(0,1.08,-.06);body.add(drape);
   const cape=new THREE.Mesh(new THREE.ConeGeometry(.44,.34,12,1,true),cloth);cape.position.y=1.02;body.add(cape);
-  const quiver=new THREE.Group();quiver.position.set(-.16,.95,-.3);quiver.rotation.set(-.25,0,.45);body.add(quiver);
-  const q=new THREE.Mesh(new THREE.CylinderGeometry(.11,.09,.55,8),leather);quiver.add(q);
-  for(const x of [-.04,.04,0]){const f=new THREE.Mesh(new THREE.ConeGeometry(.05,.16,4),L(0xe8dcc0));f.position.set(x,.35,x?0:.04);quiver.add(f);}
+  const quiver=new THREE.Group();quiver.position.set(-.14,.98,-.44);quiver.rotation.set(-.15,0,.55);body.add(quiver);
+  const q=new THREE.Mesh(new THREE.CylinderGeometry(.13,.1,.72,10),leather);quiver.add(q);
+  const qr=new THREE.Mesh(new THREE.CylinderGeometry(.145,.145,.06,10),dark);qr.position.y=.33;quiver.add(qr);
+  for(const [x,z] of [[-.05,0],[.05,0],[0,.05],[0,-.05]]){const sh=new THREE.Mesh(new THREE.CylinderGeometry(.012,.012,.25,4),leather);sh.position.set(x,.45,z);quiver.add(sh);
+    const f=new THREE.Mesh(new THREE.ConeGeometry(.06,.16,4),L(0xe8dcc0));f.position.set(x,.6,z);quiver.add(f);}
   const bow=new THREE.Mesh(new THREE.TorusGeometry(.42,.035,6,18,Math.PI),leather);bow.position.set(0,-.38,.06);bow.rotation.set(0,Math.PI/2,Math.PI/2);armL.add(bow);
+  const str=new THREE.Mesh(new THREE.CylinderGeometry(.008,.008,.84,4),L(0xeeeeee));str.rotation.z=Math.PI/2;bow.add(str);
   g.userData={body,legL,legR,armL,armR,head,ph:0,shot:0,hurt:0,last:new THREE.Vector3(),mats:[cloth,skin]};
   scene.add(g); return g;}
 // Animações: andar (pernas e braços), respirar parado, puxar o arco ao atirar, encolher ao levar dano.
@@ -256,8 +260,8 @@ function animArcher(g,dt){if(!g)return;const u=g.userData,sp=g.position.distance
   u.body.position.y=Math.abs(Math.sin(u.ph))*.08*mv+Math.sin(u.ph*.5)*.015*(1-mv);
   u.head.rotation.z=Math.sin(u.ph*.5)*.05;
   u.shot=Math.max(0,u.shot-dt);const k=u.shot>0?Math.sin(Math.PI*u.shot/.22):0;
-  u.armL.rotation.x=-1.35;u.armL.rotation.z=.15;
-  u.armR.rotation.x=-1.25-.25*k;u.armR.position.z=-.18*k;u.armR.rotation.z=-.35;
+  u.armL.rotation.x=-1.45;u.armL.rotation.z=.25-.08*k;
+  u.armR.rotation.x=-1.3-.35*k;u.armR.position.z=-.26*k;u.armR.rotation.z=-.45;
   if(mv>.05&&k===0){u.armR.rotation.x=-1.25+sw*.3;}
   u.hurt=Math.max(0,u.hurt-dt);const h=u.hurt/.35;
   u.body.scale.set(1+.15*h,1-.2*h,1+.15*h);u.mats[0].emissive.setHex(h>0?0x661010:0);}
