@@ -439,6 +439,37 @@ let baby=null,twin=null;
 const glitterMats=[0xff7ad9,0xffd84a,0x9be7ff,0xc58bff].map(c=>new THREE.MeshBasicMaterial({color:c}));
 const glitterGeo=new THREE.OctahedronGeometry(.22);
 // Gêmeos do Glitter: casal. Gêmeo 0819 = menino (azul), Gêmeo 1908 = menina (rosa, maria-chiquinha com laços).
+// Gêmeo 0819: bebê de cabelo cacheado escuro, óculos pretos, macacão azul-marinho com ursinho e ursinho de pelúcia.
+function drawBoy(x,hatCol){const O='#1c120c';x.lineJoin='round';x.lineCap='round';x.strokeStyle=O;
+  const F=(c,w)=>{x.fillStyle=c;x.fill();x.lineWidth=w||5;x.stroke();},E=(cx,cy,rx,ry)=>{x.beginPath();x.ellipse(cx,cy,rx,ry,0,0,7);};
+  const hair='#2a1a12',navy='#1f2c55',skin='#f0c8a8',bear='#d9b98a';
+  x.fillStyle='rgba(0,0,0,.25)';E(64,120,30,6);x.fill();
+  for(const s of [-1,1]){E(64+s*12,113,8,6);F(navy,4);}
+  // macacão
+  E(64,98,30,20);F(navy);
+  for(const s of [-1,1]){E(64+s*26,90,9,9);F(navy,4);}
+  E(52,96,6,5.5);F('#a8794a',2.5);for(const s of [-1,1]){E(52+s*5,91.5,2.2,2.2);F('#a8794a',1.5);}E(52,97.5,2,1.4);x.fillStyle=O;x.fill();
+  // rosto gordinho
+  E(64,58,31,28);F(skin);
+  // cachos no alto da cabeça
+  for(const [cx,cy,r] of [[40,44,9],[50,34,10],[64,30,10],[78,34,10],[88,44,9],[36,54,6],[92,54,6]]){E(cx,cy,r,r);F(hair,3.5);}
+  // chapéu de festa
+  x.beginPath();x.moveTo(46,26);x.lineTo(60,-2);x.lineTo(76,24);x.closePath();F(hatCol,4);E(60,0,6,6);F('#fff',3);
+  // olhos grandes com óculos pretos
+  for(const s of [-1,1]){const ex=64+s*12;E(ex,60,6,7.5);x.fillStyle='#24140c';x.fill();
+    x.fillStyle='#fff';E(ex-2,57,2.2,2.5);x.fill();E(ex+2,63,1,1.1);x.fill();
+    x.lineWidth=1.8;x.beginPath();x.moveTo(ex+s*4,53);x.lineTo(ex+s*6.5,50.5);x.stroke();
+    x.beginPath();x.roundRect(ex-10,51,20,17,4);x.lineWidth=3.5;x.stroke();}
+  x.beginPath();x.moveTo(62,57);x.lineTo(66,57);x.lineWidth=3;x.stroke();
+  for(const s of [-1,1]){x.beginPath();x.moveTo(64+s*22,55);x.lineTo(64+s*30,53);x.lineWidth=3;x.stroke();}
+  x.fillStyle='rgba(255,120,140,.5)';for(const s of [-1,1]){E(64+s*22,73,6,4);x.fill();}
+  x.beginPath();x.moveTo(58,74);x.quadraticCurveTo(64,80,70,74);x.lineWidth=2.5;x.stroke();
+  // ursinho de pelúcia abraçado
+  for(const s of [-1,1]){E(80+s*10,90,5,5);F(bear,3);}
+  E(80,100,14,13);F(bear,4);E(80,104,6,4.5);F('#f2e2c6',2);
+  x.fillStyle=O;for(const s of [-1,1]){E(80+s*5,98,1.8,1.8);x.fill();}E(80,102.5,2,1.5);x.fill();
+  x.beginPath();x.moveTo(74,112);x.lineTo(80,109);x.lineTo(86,112);x.lineTo(80,115);x.closePath();F(navy,2);
+  E(50,102,6,6);F(skin,3);E(94,104,6,6);F(skin,3);}
 // Gêmea 1908: bebê de cabelo cacheado escuro, brinco turquesa, vestido vinho e coelhinho de pelúcia.
 function drawGirl(x,hatCol){const O='#1c120c';x.lineJoin='round';x.lineCap='round';x.strokeStyle=O;
   const F=(c,w)=>{x.fillStyle=c;x.fill();x.lineWidth=w||5;x.stroke();},E=(cx,cy,rx,ry)=>{x.beginPath();x.ellipse(cx,cy,rx,ry,0,0,7);};
@@ -475,7 +506,7 @@ function drawGirl(x,hatCol){const O='#1c120c';x.lineJoin='round';x.lineCap='roun
   E(80,103,1.8,1.4);x.fillStyle='#f08aa8';x.fill();
   x.beginPath();x.moveTo(86,90);x.lineTo(93,86);x.lineTo(93,94);x.closePath();F('#f6a5c0',2);
   E(50,102,6,6);F(skin,3);E(94,104,6,6);F(skin,3);}
-function drawBaby(x,girl,hatCol){if(girl)return drawGirl(x,hatCol);const O='#1c120c';x.lineJoin='round';x.lineCap='round';x.strokeStyle=O;
+function drawBaby(x,girl,hatCol){return girl?drawGirl(x,hatCol):drawBoy(x,hatCol);const O='#1c120c';x.lineJoin='round';x.lineCap='round';x.strokeStyle=O;
   const F=(c,w)=>{x.fillStyle=c;x.fill();x.lineWidth=w||5;x.stroke();},E=(cx,cy,rx,ry)=>{x.beginPath();x.ellipse(cx,cy,rx,ry,0,0,7);};
   const suit=girl?'#8a2638':'#8cc8ff',hair=girl?'#2a1a14':'#7a4a2a';
   x.fillStyle='rgba(0,0,0,.25)';E(64,120,30,6);x.fill();
