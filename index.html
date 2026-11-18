@@ -213,12 +213,55 @@ for(let i=-5;i<=5;i+=2){const m=new THREE.Mesh(new THREE.BoxGeometry(.9,.7,1),wa
 for(let i=0;i<26;i++){const s=i%2?-1:1,t=new THREE.Mesh(new THREE.ConeGeometry(.9,2.4,6),new THREE.MeshLambertMaterial({color:0x22402a}));
   t.position.set(s*(HALF+2.2+Math.random()*4),1.2,2+Math.random()*32);scene.add(t);}
 
-function mkArcher(col){const g=new THREE.Group();
-  const b=new THREE.Mesh(new THREE.CylinderGeometry(.42,.5,1.2,10),new THREE.MeshLambertMaterial({color:col})); b.position.y=.6; g.add(b);
-  const h=new THREE.Mesh(new THREE.SphereGeometry(.34,12,10),new THREE.MeshLambertMaterial({color:0xf0c9a0})); h.position.y=1.45; g.add(h);
-  const bow=new THREE.Mesh(new THREE.TorusGeometry(.45,.05,6,16,Math.PI),new THREE.MeshLambertMaterial({color:0x8a5a2b})); bow.position.set(0,.9,.45); bow.rotation.set(Math.PI/2,0,Math.PI/2); g.add(bow);
+// Arqueira chibi (inspirada na arte do Arteco): capuz, cabeça grande, cinto, botas, aljava.
+// Partes com pivô para animar: pernas, braços, corpo e arco.
+function mkArcher(col,hairCol){const g=new THREE.Group(),L=c=>new THREE.MeshLambertMaterial({color:c});
+  const skin=L(0xf2c4a4),cloth=L(col),dark=L(0x6b4426),leather=L(0x8a5a32),gold=L(0xd9a92e),hair=L(hairCol||0xd8487a);
+  const body=new THREE.Group(); g.add(body);
+  const mkLeg=x=>{const p=new THREE.Group();p.position.set(x,.42,0);
+    const l=new THREE.Mesh(new THREE.CylinderGeometry(.09,.09,.2,8),skin);l.position.y=-.12;p.add(l);
+    const bt=new THREE.Mesh(new THREE.CylinderGeometry(.14,.15,.24,8),dark);bt.position.y=-.3;p.add(bt);
+    const toe=new THREE.Mesh(new THREE.BoxGeometry(.22,.1,.3),dark);toe.position.set(0,-.37,.06);p.add(toe);body.add(p);return p;};
+  const legL=mkLeg(.15),legR=mkLeg(-.15);
+  const tunic=new THREE.Mesh(new THREE.CylinderGeometry(.27,.4,.58,12),cloth);tunic.position.y=.66;body.add(tunic);
+  const belt=new THREE.Mesh(new THREE.CylinderGeometry(.33,.35,.08,12),leather);belt.position.y=.62;body.add(belt);
+  const buckle=new THREE.Mesh(new THREE.BoxGeometry(.13,.11,.04),gold);buckle.position.set(0,.62,.34);body.add(buckle);
+  const strap=new THREE.Mesh(new THREE.BoxGeometry(.07,.62,.04),leather);strap.position.set(0,.8,.25);strap.rotation.z=.75;body.add(strap);
+  const mkArm=x=>{const p=new THREE.Group();p.position.set(x,.9,0);
+    const a=new THREE.Mesh(new THREE.CylinderGeometry(.075,.07,.36,8),skin);a.position.y=-.17;p.add(a);
+    const br=new THREE.Mesh(new THREE.CylinderGeometry(.095,.095,.13,8),leather);br.position.y=-.27;p.add(br);
+    const hd=new THREE.Mesh(new THREE.SphereGeometry(.08,8,6),skin);hd.position.y=-.38;p.add(hd);body.add(p);return p;};
+  const armL=mkArm(.33),armR=mkArm(-.33);
+  const head=new THREE.Group();head.position.y=1.32;body.add(head);
+  const face=new THREE.Mesh(new THREE.SphereGeometry(.36,16,12),skin);face.position.z=.05;head.add(face);
+  const bangs=new THREE.Mesh(new THREE.SphereGeometry(.3,12,8,0,Math.PI*2,0,Math.PI*.35),hair);bangs.position.set(0,.13,.1);bangs.rotation.x=.55;head.add(bangs);
+  for(const x of [-.13,.13]){const e=new THREE.Mesh(new THREE.SphereGeometry(.06,8,6),L(0x2f7fd8));e.position.set(x,0,.37);head.add(e);
+    const w=new THREE.Mesh(new THREE.SphereGeometry(.022,6,4),L(0xffffff));w.position.set(x+.02,.025,.42);head.add(w);}
+  const hood=new THREE.Mesh(new THREE.SphereGeometry(.44,16,12),cloth);hood.position.set(0,.07,-.15);head.add(hood);
+  const rim=new THREE.Mesh(new THREE.TorusGeometry(.33,.06,8,20),cloth);rim.position.set(0,.03,.2);rim.scale.set(1,1.1,1);head.add(rim);
+  const tip=new THREE.Mesh(new THREE.ConeGeometry(.24,.42,10),cloth);tip.position.set(0,.42,-.28);tip.rotation.x=-.5;head.add(tip);
+  const cape=new THREE.Mesh(new THREE.ConeGeometry(.44,.34,12,1,true),cloth);cape.position.y=1.02;body.add(cape);
+  const quiver=new THREE.Group();quiver.position.set(-.16,.95,-.3);quiver.rotation.set(-.25,0,.45);body.add(quiver);
+  const q=new THREE.Mesh(new THREE.CylinderGeometry(.11,.09,.55,8),leather);quiver.add(q);
+  for(const x of [-.04,.04,0]){const f=new THREE.Mesh(new THREE.ConeGeometry(.05,.16,4),L(0xe8dcc0));f.position.set(x,.35,x?0:.04);quiver.add(f);}
+  const bow=new THREE.Mesh(new THREE.TorusGeometry(.42,.035,6,18,Math.PI),leather);bow.position.set(0,-.38,.06);bow.rotation.set(0,Math.PI/2,Math.PI/2);armL.add(bow);
+  g.userData={body,legL,legR,armL,armR,head,ph:0,shot:0,hurt:0,last:new THREE.Vector3(),mats:[cloth,skin]};
   scene.add(g); return g;}
-const player=mkArcher(0x3f9cff); player.position.set(0,0,PZ); player.scale.setScalar(1.4);
+// Animações: andar (pernas e braços), respirar parado, puxar o arco ao atirar, encolher ao levar dano.
+function archerShoot(g){if(g)g.userData.shot=.22;}
+function archerHurt(g){if(g)g.userData.hurt=.35;}
+function animArcher(g,dt){if(!g)return;const u=g.userData,sp=g.position.distanceTo(u.last)/Math.max(dt,1e-3);u.last.copy(g.position);
+  const mv=Math.min(1,sp/5);u.ph+=dt*(4+10*mv);
+  const sw=Math.sin(u.ph)*.7*mv;u.legL.rotation.x=sw;u.legR.rotation.x=-sw;
+  u.body.position.y=Math.abs(Math.sin(u.ph))*.08*mv+Math.sin(u.ph*.5)*.015*(1-mv);
+  u.head.rotation.z=Math.sin(u.ph*.5)*.05;
+  u.shot=Math.max(0,u.shot-dt);const k=u.shot>0?Math.sin(Math.PI*u.shot/.22):0;
+  u.armL.rotation.x=-1.35;u.armL.rotation.z=.15;
+  u.armR.rotation.x=-1.25-.25*k;u.armR.position.z=-.18*k;u.armR.rotation.z=-.35;
+  if(mv>.05&&k===0){u.armR.rotation.x=-1.25+sw*.3;}
+  u.hurt=Math.max(0,u.hurt-dt);const h=u.hurt/.35;
+  u.body.scale.set(1+.15*h,1-.2*h,1+.15*h);u.mats[0].emissive.setHex(h>0?0x661010:0);}
+const player=mkArcher(0x4f9a3a); player.position.set(0,0,PZ); player.scale.setScalar(1.6);
 let helper=null, knight=null;
 const shieldMesh=new THREE.Mesh(new THREE.SphereGeometry(1,16,12),new THREE.MeshBasicMaterial({color:0x7fc8ff,transparent:true,opacity:.22}));
 shieldMesh.position.y=.8; player.add(shieldMesh);
@@ -293,7 +336,7 @@ function hitEnemy(e,ar){
 }
 function loseHeart(){
   if(run.shield){run.shield=false;run.shieldT=30;toast('Escudo bloqueou!');return;}
-  run.hp--; flash(0xe2574c); sfx('hurt');
+  run.hp--; flash(0xe2574c); sfx('hurt'); archerHurt(player);
   if(run.hp<=0&&revive())return;
   if(run.hp<=0){run.done=true; const k=Math.floor((run.earned||0)/2);
     msg('Você foi alcançado!','Você volta ao menu e fica com metade do gold que ganhou nesta fase: +'+k+' gold.',()=>{keepHalf();carry=false;$('mCards').hidden=true;showHub();});}
@@ -333,7 +376,7 @@ function throwGlitter(from,B){B=B||BABY;const tgt=nearest(from.x,from.z);let ang
 function syncUnits(){const st=stats();
   const wantBaby=!!(S.baby&&S.babyOn); if(wantBaby&&!baby)baby=mkBaby(0xffd84a); if(!wantBaby&&baby){scene.remove(baby);baby=null;}
   const wantTwin=!!(S.twin&&S.twinOn); if(wantTwin&&!twin)twin=mkBaby(0x9be7ff); if(!wantTwin&&twin){scene.remove(twin);twin=null;}
-  if(st.ajud&&!helper){helper=mkArcher(0x4fa07a);} if(!st.ajud&&helper){scene.remove(helper);helper=null;}
+  if(st.ajud&&!helper){helper=mkArcher(0x3f7fd0,0xf0c060);helper.scale.setScalar(1.2);} if(!st.ajud&&helper){scene.remove(helper);helper=null;}
   if(st.cav&&!knight){knight=new THREE.Group();const b=new THREE.Mesh(new THREE.BoxGeometry(1.1,1.4,.6),new THREE.MeshLambertMaterial({color:0xb8c0c8}));b.position.y=.7;knight.add(b);
     const s=new THREE.Mesh(new THREE.BoxGeometry(1.5,1,.15),new THREE.MeshLambertMaterial({color:0x8a3a2a}));s.position.set(0,.8,.4);knight.add(s);scene.add(knight);}
   if(!st.cav&&knight){scene.remove(knight);knight=null;}
@@ -362,6 +405,7 @@ function step(dt){
   if(twin){twin.position.set(Math.max(-HALF,Math.min(HALF,player.position.x+(player.position.x<-2?1.1:-1.1))),0,PPZ-.9);twin.children.forEach(c=>c.rotation.y-=dt*4);}
   if(helper)helper.position.set(Math.max(-HALF,Math.min(HALF,player.position.x+(player.position.x>2?-1.3:1.3))),0,PPZ+.2);
   if(knight)knight.position.set(player.position.x,0,PPZ+4.2);
+  animArcher(player,dt);animArcher(helper,dt);
   // ondas
   if(!run.bossSpawned){
     if(run.toSpawn>0){run.spawnT-=dt;if(run.spawnT<=0){spawn(pickType());run.toSpawn--;run.spawnT=waveInterval();}}
@@ -371,8 +415,8 @@ function step(dt){
     }
   }
   // tiros
-  if(run.en.length){run.fireT-=dt;if(run.fireT<=0){run.fireT=1/st.rate;shoot(player.position,st.dmg,st.shots+(run.triple>0?2:0),run.triple>0);}
-    if(helper){run.helpT-=dt;if(run.helpT<=0){run.helpT=1/st.rate;shoot(helper.position,st.dmg*.5,Math.max(1,Math.floor((st.shots+(run.triple>0?2:0))/2)),run.triple>0,true);}}
+  if(run.en.length){run.fireT-=dt;if(run.fireT<=0){run.fireT=1/st.rate;shoot(player.position,st.dmg,st.shots+(run.triple>0?2:0),run.triple>0);archerShoot(player);}
+    if(helper){run.helpT-=dt;if(run.helpT<=0){run.helpT=1/st.rate;shoot(helper.position,st.dmg*.5,Math.max(1,Math.floor((st.shots+(run.triple>0?2:0))/2)),run.triple>0,true);archerShoot(helper);}}
     if(baby){run.babyT-=dt;if(run.babyT<=0){run.babyT=BABY.every;throwGlitter(baby.position,BABY);}}
     if(twin){run.twinT-=dt;if(run.twinT<=0){run.twinT=TWIN.every;throwGlitter(twin.position,TWIN);}}}
   run.triple=Math.max(0,run.triple-dt); run.slowAll=Math.max(0,run.slowAll-dt);
