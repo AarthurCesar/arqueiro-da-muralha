@@ -438,16 +438,28 @@ const TWIN={dmg:2,every:1.4,balls:2,boom:1.2,speed:14};
 let baby=null,twin=null;
 const glitterMats=[0xff7ad9,0xffd84a,0x9be7ff,0xc58bff].map(c=>new THREE.MeshBasicMaterial({color:c}));
 const glitterGeo=new THREE.OctahedronGeometry(.22);
-function mkBaby(hatCol){const g=new THREE.Group();
-  const tex=canvasTex(128,128,(x)=>{x.lineWidth=5;x.strokeStyle='#1c120c';
-    x.beginPath();x.fillStyle='#ffb6d9';x.ellipse(64,96,34,26,0,0,7);x.fill();x.stroke();
-    x.beginPath();x.fillStyle='#f6d2b4';x.arc(64,60,30,0,7);x.fill();x.stroke();
-    x.beginPath();x.fillStyle=hex(hatCol||0xffd84a);x.moveTo(40,38);x.lineTo(64,2);x.lineTo(88,38);x.closePath();x.fill();x.stroke();
-    x.fillStyle='#fff';x.beginPath();x.arc(64,4,6,0,7);x.fill();
-    x.fillStyle='#1c120c';for(const s of [-1,1]){x.beginPath();x.arc(64+s*11,60,4.5,0,7);x.fill();}
-    x.fillStyle='rgba(255,120,150,.5)';for(const s of [-1,1]){x.beginPath();x.arc(64+s*20,70,6,0,7);x.fill();}
-    x.lineWidth=3;x.beginPath();x.arc(64,70,7,.2,Math.PI-.2);x.stroke();});
-  const spr=mkSprite(tex,1.5,1.5,1.1);g.add(spr);g.userData={spr,ph:Math.random()*6};scene.add(g);return g;}
+// Gêmeos do Glitter: casal. Gêmeo 0819 = menino (azul), Gêmeo 1908 = menina (rosa, maria-chiquinha com laços).
+function drawBaby(x,girl,hatCol){const O='#1c120c';x.lineJoin='round';x.lineCap='round';x.strokeStyle=O;
+  const F=(c,w)=>{x.fillStyle=c;x.fill();x.lineWidth=w||5;x.stroke();},E=(cx,cy,rx,ry)=>{x.beginPath();x.ellipse(cx,cy,rx,ry,0,0,7);};
+  const suit=girl?'#ff9cc8':'#8cc8ff',hair=girl?'#f0a24a':'#7a4a2a';
+  x.fillStyle='rgba(0,0,0,.25)';E(64,120,30,6);x.fill();
+  for(const s of [-1,1]){E(64+s*15,112,10,7);F(suit,4);}
+  if(girl){x.beginPath();x.moveTo(40,80);x.lineTo(88,80);x.lineTo(98,112);x.quadraticCurveTo(64,120,30,112);x.closePath();F(suit);
+    x.beginPath();x.moveTo(34,104);x.quadraticCurveTo(64,112,94,104);x.lineWidth=3;x.strokeStyle='#fff';x.stroke();x.strokeStyle=O;}
+  else{E(64,96,30,22);F(suit);E(64,100,7,7);F('#ffe27a',3);}
+  for(const s of [-1,1]){E(64+s*30,90,8,8);F('#f6d2b4',4);}
+  E(64,58,30,28);F('#f6d2b4');
+  if(girl){for(const s of [-1,1]){E(64+s*32,52,9,13);F(hair,4);x.beginPath();x.moveTo(64+s*26,40);x.lineTo(64+s*40,32);x.lineTo(64+s*40,46);x.closePath();F('#e23a7a',3);}
+    x.beginPath();x.moveTo(36,52);x.quadraticCurveTo(44,28,64,30);x.quadraticCurveTo(84,28,92,52);x.quadraticCurveTo(76,40,64,44);x.quadraticCurveTo(52,40,36,52);x.closePath();F(hair,4);}
+  else{x.beginPath();x.moveTo(52,34);x.quadraticCurveTo(60,22,70,30);x.quadraticCurveTo(64,30,62,36);x.lineWidth=5;x.strokeStyle=O;x.stroke();x.lineWidth=3;x.strokeStyle=hair;x.stroke();x.strokeStyle=O;}
+  x.beginPath();x.fillStyle=hatCol;x.moveTo(girl?52:44,34);x.lineTo(girl?66:60,2);x.lineTo(girl?82:78,32);x.closePath();F(hatCol,4);
+  E(girl?66:60,4,6,6);F('#fff',3);
+  x.fillStyle=O;for(const s of [-1,1]){E(64+s*11,60,4.5,5.5);x.fill();}
+  x.fillStyle='rgba(255,120,150,.5)';for(const s of [-1,1]){E(64+s*20,70,6,4);x.fill();}
+  x.beginPath();x.arc(64,68,7,.2,Math.PI-.2);x.lineWidth=3;x.stroke();}
+function mkBaby(hatCol,girl){const g=new THREE.Group();
+  const tex=canvasTex(256,256,(x)=>{x.scale(2,2);drawBaby(x,girl,hex(hatCol||0xffd84a));});
+  const spr=mkSprite(tex,1.6,1.6,1.1);g.add(spr);g.userData={spr,ph:Math.random()*6};scene.add(g);return g;}
 function throwGlitter(from,B){B=B||BABY;const tgt=nearest(from.x,from.z);let ang=0;
   if(tgt)ang=Math.atan2(tgt.m.position.x-from.x,tgt.m.position.z-from.z);
   for(let i=0;i<B.balls;i++){const a=ang+(i-(B.balls-1)/2)*.18,m=new THREE.Mesh(glitterGeo,glitterMats[(Math.random()*4)|0]);
@@ -455,8 +467,8 @@ function throwGlitter(from,B){B=B||BABY;const tgt=nearest(from.x,from.z);let ang
     run.ar.push({m,vx:Math.sin(a)*B.speed,vz:Math.cos(a)*B.speed,dmg:B.dmg,pierce:0,boom:B.boom,fixed:true,hit:new Set()});}
   sfx('bonus');}
 function syncUnits(){const st=stats();
-  const wantBaby=!!(S.baby&&S.babyOn); if(wantBaby&&!baby)baby=mkBaby(0xffd84a); if(!wantBaby&&baby){scene.remove(baby);baby=null;}
-  const wantTwin=!!(S.twin&&S.twinOn); if(wantTwin&&!twin)twin=mkBaby(0x9be7ff); if(!wantTwin&&twin){scene.remove(twin);twin=null;}
+  const wantBaby=!!(S.baby&&S.babyOn); if(wantBaby&&!baby)baby=mkBaby(0xffd84a,true); if(!wantBaby&&baby){scene.remove(baby);baby=null;}
+  const wantTwin=!!(S.twin&&S.twinOn); if(wantTwin&&!twin)twin=mkBaby(0x4aa8ff,false); if(!wantTwin&&twin){scene.remove(twin);twin=null;}
   if(st.ajud&&!helper){helper=mkArcher(helpTex,2.3);} if(!st.ajud&&helper){scene.remove(helper);helper=null;}
   if(st.cav&&!knight){knight=new THREE.Group();const b=new THREE.Mesh(new THREE.BoxGeometry(1.1,1.4,.6),new THREE.MeshLambertMaterial({color:0xb8c0c8}));b.position.y=.7;knight.add(b);
     const s=new THREE.Mesh(new THREE.BoxGeometry(1.5,1,.15),new THREE.MeshLambertMaterial({color:0x8a3a2a}));s.position.set(0,.8,.4);knight.add(s);scene.add(knight);}
@@ -483,7 +495,7 @@ function step(dt){
    if(dl>1e-4){player.position.x+=dx/dl*mv;player.position.z+=dz/dl*mv;}}
   const PPZ=player.position.z;
   if(baby){baby.position.set(Math.max(-HALF,Math.min(HALF,player.position.x+(player.position.x<-2?1.3:-1.3))),0,PPZ+.2);baby.userData.ph+=dt*5;baby.userData.spr.position.z=Math.abs(Math.sin(baby.userData.ph))*.15;}
-  if(twin){twin.position.set(Math.max(-HALF,Math.min(HALF,player.position.x+(player.position.x<-2?1.1:-1.1))),0,PPZ-.9);twin.userData.ph+=dt*5;twin.userData.spr.position.z=Math.abs(Math.sin(twin.userData.ph))*.15;}
+  if(twin){twin.position.set(Math.max(-HALF-.6,Math.min(HALF+.6,player.position.x+(player.position.x<-2?2.4:-2.4))),0,PPZ+.1);twin.userData.ph+=dt*5;twin.userData.spr.position.z=Math.abs(Math.sin(twin.userData.ph))*.15;}
   if(helper)helper.position.set(Math.max(-HALF,Math.min(HALF,player.position.x+(player.position.x>2?-1.3:1.3))),0,PPZ+.2);
   if(knight)knight.position.set(player.position.x,0,PPZ+4.2);
   animArcher(player,dt);animArcher(helper,dt);
