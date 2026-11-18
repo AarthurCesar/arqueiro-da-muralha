@@ -136,7 +136,6 @@ const ATTRS=[
  {id:'dmg',n:'Dano',d:'+10% de dano'},
  {id:'atk',n:'Velocidade de ataque',d:'+8% de tiros'},
  {id:'mov',n:'Velocidade de movimento',d:'+6%'},
- {id:'vida',n:'Vida',d:'+1 coração'},
  {id:'xp',n:'Ganho de XP',d:'+10% de XP'},
 ];
 const ETYPES={
@@ -183,7 +182,7 @@ function resetPhaseStuff(){S.lvl=1;S.xp=0;S.cards={};S.weapon=S.baseWeapon||0;}
 function stats(){
   const a=S.attrs,c=S.cards,W=WEAPONS[S.weapon||0];
   return {W, dmg:(1+.1*a.dmg)*W.dmg, rate:1.6*(1+.08*a.atk)*W.rate, mov:9*(1+.06*a.mov),
-    maxH:3+a.vida, xpm:1+.1*a.xp, shots:1+(c.dupla||0), pierce:2*(c.perf||0)+(W.pierce||0), fogo:c.fogo||0,
+    maxH:3, xpm:1+.1*a.xp, shots:1+(c.dupla||0), pierce:2*(c.perf||0)+(W.pierce||0), fogo:c.fogo||0,
     gelo:!!c.gelo, raio:!!c.raio, ajud:!!(S.helper&&S.helperOn), cav:!!c.cav, ima:!!c.ima, goldm:1+.25*(c.sorte||0), esc:!!c.esc, chuva:!!c.chuva, rico:c.rico?3:0, crit:!!c.crit, expl:!!c.expl, vamp:!!c.vamp};
 }
 const xpNeed=l=>Math.round(10*Math.pow(1.2,l-1));
@@ -389,7 +388,9 @@ function step(dt){
   for(const b of [...run.bo]){const p=b.m.position;p.z-=3*dt;b.m.rotation.y+=3*dt;
     if(st.ima&&p.z<14){p.x+=(player.position.x-p.x)*Math.min(1,3*dt);}
     if(Math.abs(p.z-PPZ)<1.2&&Math.abs(p.x-player.position.x)<(st.ima?2.5:1.1)){scene.remove(b.m);run.bo.splice(run.bo.indexOf(b),1);
-      if(b.k==='cora')run.hp=Math.min(st.maxH,run.hp+1); if(b.k==='ouro')S.gold+=30; if(b.k==='flecha')run.triple=8; if(b.k==='relogio')run.slowAll=5; toast(BON[b.k].n);sfx('bonus');}
+      let msgB=BON[b.k].n;
+      if(b.k==='cora'){if(run.hp<st.maxH)run.hp++;else{S.gold+=250;msgB='Vida cheia: +250 gold';}}
+      if(b.k==='ouro')S.gold+=30; if(b.k==='flecha')run.triple=8; if(b.k==='relogio')run.slowAll=5; toast(msgB);sfx('bonus');}
     else if(p.z<PZ-1){scene.remove(b.m);run.bo.splice(run.bo.indexOf(b),1);}}
   for(const f of [...run.fx]){f.life-=dt;if(f.life<=0){scene.remove(f.m);run.fx.splice(run.fx.indexOf(f),1);}}
 }
