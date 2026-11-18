@@ -67,6 +67,7 @@ p{margin:0;color:var(--muted);line-height:1.45}
   <button class="btn ghost" id="btnArms">Armas</button>
   <button class="btn ghost" id="btnShop">Loja</button>
   <button class="btn ghost" id="btnQuit">Sair</button>
+  <div class="row" id="testBar" hidden><button class="btn ghost" id="tPrev">Fase -5</button><button class="btn ghost" id="tNext">Fase +5</button><button class="btn ghost" id="tGold">+1000 gold</button></div>
   <p class="tag">Protótipo · formas simples no lugar da arte</p>
 </div></div>
 <div class="modal" id="mCards" hidden><div class="box">
@@ -126,6 +127,10 @@ const CARDS=[
  {id:'sorte',n:'Sorte',t:'Passiva',d:'+25% de gold',p:70,ic:'$'},
  {id:'esc',n:'Escudo',t:'Passiva',d:'Bloqueia 1 toque a cada 30 s',p:90,ic:'E',u:1},
  {id:'chuva',n:'Chuva de flechas',t:'Especial',d:'A cada 15 s, dano na tela toda',p:130,ic:'≡',u:1},
+ {id:'rico',n:'Ricochete',t:'Arma',d:'O tiro quica em mais 2 inimigos',p:90,ic:'↯'},
+ {id:'crit',n:'Golpe crítico',t:'Arma',d:'20% de chance de 3x dano',p:80,ic:'!'},
+ {id:'expl',n:'Flecha explosiva',t:'Arma',d:'Cada tiro explode numa área pequena',p:110,ic:'*'},
+ {id:'vamp',n:'Vampiro',t:'Passiva',d:'A cada 25 inimigos derrotados, recupera 1 coração',p:100,ic:'V'},
 ];
 const ATTRS=[
  {id:'dmg',n:'Dano',d:'+10% de dano'},
@@ -165,11 +170,11 @@ let S, snap, run=null;
 // Escada de armas: cada evolução libera numa fase e aparece como carta garantida ao subir de nível.
 const WEAPONS=[
  {n:'Arco e flecha',dmg:1,rate:1,col:0xf3e2b0,size:1,speed:24},
- {n:'Besta',d:'Virotes pesados: 2,5x dano, tiro mais lento',dmg:2.5,rate:.6,ph:1,p:120,shop:150,col:0xb9895a,size:1.2,speed:28},
- {n:'Mosquete',d:'Bala de chumbo: 5x dano, atravessa 1 inimigo',dmg:5,rate:.45,ph:2,p:160,shop:300,col:0xdddddd,size:1.3,speed:40,pierce:1},
- {n:'Metralhadora',d:'Chuva de balas: 3x mais tiros',dmg:1.6,rate:3,ph:3,p:200,shop:500,col:0xffd060,size:.8,speed:45},
- {n:'Lança-foguetes',d:'Foguetes que explodem em área',dmg:6,rate:.5,ph:4,p:260,shop:800,col:0xff7a30,size:2.2,speed:18,boom:2.4},
- {n:'Canhão laser',d:'Raio que atravessa tudo na frente',dmg:4,rate:2.2,ph:5,p:320,shop:1200,col:0xff3355,size:1.8,speed:70,pierce:99},
+ {n:'Besta',d:'Virotes pesados: 2,5x dano, tiro mais lento',dmg:2.5,rate:.6,ph:3,p:120,shop:150,col:0xb9895a,size:1.2,speed:28},
+ {n:'Mosquete',d:'Bala de chumbo: 5x dano, atravessa 1 inimigo',dmg:5,rate:.45,ph:6,p:160,shop:300,col:0xdddddd,size:1.3,speed:40,pierce:1},
+ {n:'Metralhadora',d:'Chuva de balas: 3x mais tiros',dmg:1.6,rate:3,ph:11,p:200,shop:500,col:0xffd060,size:.8,speed:45},
+ {n:'Lança-foguetes',d:'Foguetes que explodem em área',dmg:6,rate:.5,ph:16,p:260,shop:800,col:0xff7a30,size:2.2,speed:18,boom:2.4},
+ {n:'Canhão laser',d:'Raio que atravessa tudo na frente',dmg:4,rate:2.2,ph:21,p:320,shop:1200,col:0xff3355,size:1.8,speed:70,pierce:99},
 ];
 function fresh(){return {phase:1,gold:0,xp:0,lvl:1,weapon:0,baseWeapon:0,owned:[0],helper:false,helperOn:false,baby:false,babyOn:false,attrs:{dmg:0,atk:0,mov:0,vida:0,xp:0},cards:{}};}
 const clone=o=>JSON.parse(JSON.stringify(o));
@@ -179,11 +184,13 @@ function stats(){
   const a=S.attrs,c=S.cards,W=WEAPONS[S.weapon||0];
   return {W, dmg:(1+.1*a.dmg)*W.dmg, rate:1.6*(1+.08*a.atk)*W.rate, mov:9*(1+.06*a.mov),
     maxH:3+a.vida, xpm:1+.1*a.xp, shots:1+(c.dupla||0), pierce:2*(c.perf||0)+(W.pierce||0), fogo:c.fogo||0,
-    gelo:!!c.gelo, raio:!!c.raio, ajud:!!(S.helper&&S.helperOn), cav:!!c.cav, ima:!!c.ima, goldm:1+.25*(c.sorte||0), esc:!!c.esc, chuva:!!c.chuva};
+    gelo:!!c.gelo, raio:!!c.raio, ajud:!!(S.helper&&S.helperOn), cav:!!c.cav, ima:!!c.ima, goldm:1+.25*(c.sorte||0), esc:!!c.esc, chuva:!!c.chuva, rico:c.rico?2:0, crit:!!c.crit, expl:!!c.expl, vamp:!!c.vamp};
 }
 const xpNeed=l=>Math.round(10*Math.pow(1.2,l-1));
 const attrCost=n=>5*(n+1);
-const cardCost=c=>Math.round(c.p*.4*Math.pow(1.25,S.phase-1));
+// Curva de dificuldade (fases avançadas): vida x1,15 por fase, velocidade até 1,8x, gold e preço das cartas +10% por fase.
+const phaseGold=()=>1+.1*(S.phase-1);
+const cardCost=c=>Math.round(c.p*.4*phaseGold());
 
 // ---------- three ----------
 const renderer=new THREE.WebGLRenderer({canvas:$('c'),antialias:true});
@@ -233,15 +240,15 @@ function startPhase(keep){
   ground.material.color.setHex(era().ground); lane.material.color.setHex(era().lane);
   syncUnits(); hud(); toast('Fase '+S.phase+': '+era().n);
 }
-function waveCount(w){return 6+2*w+2*(S.phase-1);}
-function waveInterval(){return Math.max(.32,1.25-.08*S.phase-.05*run.wave);}
+function waveCount(w){return 6+2*w+Math.round(.8*(S.phase-1));}
+function waveInterval(){return Math.max(.35,1.25-.03*S.phase-.05*run.wave);}
 function pickType(){const w=run.wave,p=S.phase,pool=['goblin','goblin'];
   if(w>=2||p>1)pool.push('lobo'); if(w>=3||p>1)pool.push('morcego'); if(w>=4||p>1)pool.push('golem'); return pool[Math.random()*pool.length|0];}
 function spawn(type,x,z){
-  const T=ETYPES[type],V=era()[type],sc=(1+.3*(S.phase-1))*(S.phase===1?.5:1),m=new THREE.Mesh(geo[V.shape],new THREE.MeshLambertMaterial({color:V.col}));
+  const T=ETYPES[type],V=era()[type],sc=Math.pow(1.15,S.phase-1)*(S.phase===1?.5:1),m=new THREE.Mesh(geo[V.shape],new THREE.MeshLambertMaterial({color:V.col}));
   const s=T.r*2; m.scale.set(s,s,s); if(V.shape==='cone'){m.rotation.x=-Math.PI/2;}
   m.position.set(x??(Math.random()*2-1)*HALF, T.fly?1.4:T.r, z??SPAWNZ); scene.add(m);
-  const e={m,type,T,hp:T.hp*sc,max:T.hp*sc,sp:T.sp*(1+.1*(S.phase-1)),r:T.r,x0:m.position.x,ph:Math.random()*6,burn:0,burnD:0,slow:0,sumT:4};
+  const e={m,type,T,hp:T.hp*sc,max:T.hp*sc,sp:T.sp*Math.min(1.8,1+.03*(S.phase-1)),r:T.r,x0:m.position.x,ph:Math.random()*6,burn:0,burnD:0,slow:0,sumT:4};
   run.en.push(e); if(T.boss) run.boss=e; return e;
 }
 function nearest(x,z){let b=null,bd=1e9;for(const e of run.en){const d=(e.m.position.x-x)**2+(e.m.position.z-z)**2;if(d<bd){bd=d;b=e;}}return b;}
@@ -254,12 +261,13 @@ function shoot(from,dmg,count,gold,half){
   for(let i=0;i<count;i++){const a=ang+(i-(count-1)/2)*.14;
     const m=new THREE.Mesh(arrowGeo,mat); m.scale.set(W.size*1.4,W.size*1.4,W.size); m.position.set(from.x,1,from.z+.5); m.rotation.y=a; scene.add(m);
     if(i===0)sfx('shot');
-    run.ar.push({m,vx:Math.sin(a)*W.speed,vz:Math.cos(a)*W.speed,dmg,pierce:half?Math.floor(st.pierce/2):st.pierce,boom:W.boom||0,half:!!half,hit:new Set()});}
+    run.ar.push({m,vx:Math.sin(a)*W.speed,vz:Math.cos(a)*W.speed,dmg,pierce:half?Math.floor(st.pierce/2):st.pierce,boom:W.boom||(st.expl?1.2:0),bounce:half?Math.floor(st.rico/2):st.rico,half:!!half,hit:new Set()});}
 }
 function hurt(e,d){e.hp-=d; e.m.material.emissive&&e.m.material.emissive.setHex(0x553322); e.flash=.08;}
 function kill(e){
   sfx('kill'); scene.remove(e.m); run.en.splice(run.en.indexOf(e),1);
-  const st=stats(); S.gold+=Math.round(e.T.g*st.goldm); gainXp(e.T.xp*st.xpm);
+  const st=stats(); S.gold+=Math.round(e.T.g*st.goldm*phaseGold()); gainXp(e.T.xp*st.xpm);
+  if(st.vamp){run.kills=(run.kills||0)+1;if(run.kills%25===0&&run.hp<st.maxH){run.hp++;toast('Vampiro: +1 coração');}}
   if(e===run.boss){run.boss=null; phaseWon();}
 }
 function gainXp(v){S.xp+=v; while(S.xp>=xpNeed(S.lvl)){S.xp-=xpNeed(S.lvl);S.lvl++;run.pendingLv++;sfx('level');}
@@ -267,7 +275,9 @@ function gainXp(v){S.xp+=v; while(S.xp>=xpNeed(S.lvl)){S.xp-=xpNeed(S.lvl);S.lvl
 function lightning(a,b){const g=new THREE.BufferGeometry().setFromPoints([a.clone().setY(1),b.clone().setY(1)]);
   const l=new THREE.Line(g,new THREE.LineBasicMaterial({color:0x9fd8ff})); scene.add(l); run.fx.push({m:l,life:.15});}
 function hitEnemy(e,ar){
-  const st=stats(); hurt(e,ar.dmg);
+  const st=stats(); let d=ar.dmg;
+  if(st.crit&&!ar.fixed&&Math.random()<(ar.half?.1:.2)){d*=3;e.m.material.emissive&&e.m.material.emissive.setHex(0xffff66);}
+  hurt(e,d);
   if(ar.boom){for(const o of run.en){if(o!==e&&o.m.position.distanceTo(e.m.position)<ar.boom)hurt(o,ar.dmg*.6);}
     const b=new THREE.Mesh(new THREE.SphereGeometry(ar.boom,14,10),new THREE.MeshBasicMaterial({color:ar.fixed?0xff7ad9:0xff9a40,transparent:true,opacity:.45}));
     b.position.copy(e.m.position);scene.add(b);run.fx.push({m:b,life:.18});}
@@ -347,10 +357,14 @@ function step(dt){
   if(st.chuva){run.rainT-=dt;if(run.rainT<=0){run.rainT=15;flash(0xe8b14a);for(const e of [...run.en])hurt(e,st.dmg*2);toast('Chuva de flechas!');}}
   // flechas
   for(const a of [...run.ar]){a.m.position.x+=a.vx*dt;a.m.position.z+=a.vz*dt;
-    if(a.m.position.z>SPAWNZ+3||Math.abs(a.m.position.x)>HALF+3){scene.remove(a.m);run.ar.splice(run.ar.indexOf(a),1);continue;}
+    if(a.m.position.z>SPAWNZ+3||a.m.position.z<-2||Math.abs(a.m.position.x)>HALF+3){scene.remove(a.m);run.ar.splice(run.ar.indexOf(a),1);continue;}
     for(const e of run.en){if(a.hit.has(e))continue;const p=e.m.position;
       if((p.x-a.m.position.x)**2+(p.z-a.m.position.z)**2<(e.r+.3)**2){a.hit.add(e);hitEnemy(e,a);
-        if(a.pierce--<=0){scene.remove(a.m);run.ar.splice(run.ar.indexOf(a),1);break;}}}}
+        if(a.pierce--<=0){
+          if(a.bounce>0){let n=null,bd=64;for(const o of run.en){if(a.hit.has(o))continue;const q=(o.m.position.x-p.x)**2+(o.m.position.z-p.z)**2;if(q<bd){bd=q;n=o;}}
+            if(n){a.bounce--;a.pierce=0;const dx=n.m.position.x-a.m.position.x,dz=n.m.position.z-a.m.position.z,l=Math.hypot(dx,dz)||1,s=Math.hypot(a.vx,a.vz);
+              a.vx=dx/l*s;a.vz=dz/l*s;a.m.rotation.y=Math.atan2(dx,dz);break;}}
+          scene.remove(a.m);run.ar.splice(run.ar.indexOf(a),1);break;}}}}
   // inimigos
   for(const e of [...run.en]){
     if(e.burn>0){e.burn-=dt;e.hp-=e.burnD*dt;}
@@ -440,7 +454,7 @@ let carry=false;
 const SAVE='arqueiro-save-v1';
 function save(){try{localStorage.setItem(SAVE,JSON.stringify(S));}catch(_){}}
 function load(){try{const v=JSON.parse(localStorage.getItem(SAVE));return v&&v.attrs?Object.assign(fresh(),v):null;}catch(_){return null;}}
-function showHub(){resetPhaseStuff();save();$('hubInfo').textContent='Fase '+S.phase+' ('+era().n+') · '+stats().W.n+' · '+S.gold+' gold';
+function showHub(){resetPhaseStuff();save();$('testBar').hidden=location.hash!=='#teste';$('hubInfo').textContent='Fase '+S.phase+' ('+era().n+') · '+stats().W.n+' · '+S.gold+' gold';
   $('btnStart').textContent='Jogar fase '+S.phase; $('mStart').hidden=false;}
 $('btnShop').onclick=showAttrs;
 function showArms(){const L=$('armsList');L.innerHTML='';S.owned=S.owned||[0];
@@ -456,6 +470,10 @@ function showArms(){const L=$('armsList');L.innerHTML='';S.owned=S.owned||[0];
   $('mArms').hidden=false;}
 $('btnArms').onclick=showArms;
 $('btnArmsClose').onclick=()=>{$('mArms').hidden=true;showHub();};
+// Modo de teste: abra o jogo com #teste no fim do link.
+$('tPrev').onclick=()=>{S.phase=Math.max(1,S.phase-5);showHub();};
+$('tNext').onclick=()=>{S.phase+=5;showHub();};
+$('tGold').onclick=()=>{S.gold+=1000;showHub();};
 $('btnQuit').onclick=()=>{save();$('mQuit').hidden=false;try{window.close();}catch(_){}};
 $('btnQuitBack').onclick=()=>{$('mQuit').hidden=true;};
 $('btnAttrClose').onclick=()=>{$('mAttr').hidden=true;if(!$('mStart').hidden)showHub();};
