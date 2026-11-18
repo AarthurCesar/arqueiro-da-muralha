@@ -663,15 +663,16 @@ function showAttrs(){const L=$('attrList');L.innerHTML='';$('attrGold').textCont
   const WL=$('weapList');WL.innerHTML='';
   S.owned=S.owned||[0];
   if(WEAPONS.every((w,i)=>S.owned.includes(i)))WL.innerHTML='<p>Você já tem todas as armas.</p>';
-  WEAPONS.forEach((w,i)=>{if(S.owned.includes(i))return;const own=false,eq=i===(S.baseWeapon||0),ok=own?!eq:S.gold>=w.shop,b=document.createElement('button');b.className='card'+(ok||eq?'':' off');
-    b.innerHTML=`<span class="ic">${i}</span><span class="tx"><b>${w.n}</b><small>${w.d||'Arma inicial'}</small></span><span class="pr">${own?(eq?'Equipada':'Equipar'):w.shop+' gold'}</span>`;
-    b.onclick=()=>{if(eq)return;if(own){S.baseWeapon=i;S.weapon=i;toast('Equipada: '+w.n);showAttrs();return;}
+  // Armas da Loja: precisam de gold E de fase (uma nova a cada 5 fases: 5, 10, 15, 20, 25).
+  WEAPONS.forEach((w,i)=>{if(S.owned.includes(i))return;const need=5*i,lock=S.phase<need,own=false,eq=i===(S.baseWeapon||0),ok=!lock&&S.gold>=w.shop,b=document.createElement('button');b.className='card'+(ok||eq?'':' off');
+    b.innerHTML=`<span class="ic">${lock?'🔒':i}</span><span class="tx"><b>${w.n}</b><small>${lock?'Libera na fase '+need+' · '+w.shop+' gold':(w.d||'Arma inicial')}</small></span><span class="pr">${lock?'Fase '+need:w.shop+' gold'}</span>`;
+    b.onclick=()=>{if(eq)return;if(lock){toast('Chegue na fase '+need+' para liberar');return;}
       if(!ok){toast('Gold insuficiente');return;}S.gold-=w.shop;S.owned.push(i);S.baseWeapon=i;S.weapon=i;toast('Nova arma: '+w.n);showAttrs();};WL.appendChild(b);});
   if(!S.baby){const ok=S.gold>=1908,b=document.createElement('button');b.className='card'+(ok?'':' off');
-    b.innerHTML=`<span class="ic">✦</span><span class="tx"><span class="tag">Personagem</span><b>Gêmeo 1908</b><small>O gêmeo forte: 3 bolinhas de glitter, 5 de dano cada, em área. Dano fixo, não usa seus atributos nem cartas</small></span><span class="pr">1908 gold</span>`;
+    b.innerHTML=`<span class="ic">✦</span><span class="tx"><span class="tag">Personagem</span><b>Gêmeo 1908</b><small>A menina, a mais forte: 3 bolinhas de glitter, 5 de dano cada, em área. Dano fixo, não usa seus atributos nem cartas</small></span><span class="pr">1908 gold</span>`;
     b.onclick=()=>{if(!ok){toast('Gold insuficiente');return;}S.gold-=1908;S.baby=true;S.babyOn=true;toast('Gêmeo 1908 chegou!');showAttrs();};WL.appendChild(b);}
   if(!S.twin){const ok=S.gold>=819,b=document.createElement('button');b.className='card'+(ok?'':' off');
-    b.innerHTML=`<span class="ic">✧</span><span class="tx"><span class="tag">Personagem</span><b>Gêmeo 0819</b><small>O gêmeo menor: 2 bolinhas de glitter, 2 de dano cada, em área. Dano fixo</small></span><span class="pr">0819 gold</span>`;
+    b.innerHTML=`<span class="ic">✧</span><span class="tx"><span class="tag">Personagem</span><b>Gêmeo 0819</b><small>O menino, o mais fraco: 2 bolinhas de glitter, 2 de dano cada, em área. Dano fixo</small></span><span class="pr">0819 gold</span>`;
     b.onclick=()=>{if(!ok){toast('Gold insuficiente');return;}S.gold-=819;S.twin=true;S.twinOn=true;toast('Gêmeo 0819 chegou!');showAttrs();};WL.appendChild(b);}
   {const n=S.angel||0,ok=S.gold>=400&&n<1,b=document.createElement('button');b.className='card'+(ok?'':' off');
     b.innerHTML=`<span class="ic">✝</span><span class="tx"><span class="tag">Item</span><b>Anjo da Guarda</b><small>Se você for derrotado, revive com 3 corações e a tela é limpa. Gasta ao usar. Máximo 1 guardado${n?' (você tem 1)':''}</small></span><span class="pr">${n?'Guardado':'400 gold'}</span>`;
