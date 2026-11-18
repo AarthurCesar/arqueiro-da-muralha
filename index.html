@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="pt-BR">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#141a17">
+<title>Arqueiro da Muralha</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Nunito:wght@400;700;800&display=swap">
+<style>
+/* Layout: tela cheia 3D com HUD fino no topo e janelas modais centrais. Visual único escuro de propósito. */
+:root{
+  --night:#141a17; --panel:#1f2824; --panel2:#2a3530; --gold:#e8b14a; --ink:#eef2ea; --muted:#9fb0a5;
+  --red:#e2574c; --blue:#5aa2e8; --green:#7cc56b;
+  --display:"Cinzel",Georgia,serif; --body:"Nunito",system-ui,sans-serif;
+  color-scheme:dark;
+}
+html,body{height:100%;margin:0;overflow:hidden;background:var(--night);color:var(--ink);font-family:var(--body);touch-action:none;user-select:none;-webkit-user-select:none}
+[hidden]{display:none!important}
+#c{position:fixed;inset:0;display:block}
+#hud{position:fixed;left:0;right:0;top:0;padding:calc(8px + env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px)) 8px max(12px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:6px;pointer-events:none;background:linear-gradient(var(--night),transparent)}
+.row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.hearts{font-size:20px;letter-spacing:2px;color:var(--red)}
+.pill{background:var(--panel);border:1px solid var(--panel2);border-radius:999px;padding:3px 10px;font-weight:800;font-size:13px;font-variant-numeric:tabular-nums}
+.gold{color:var(--gold)}
+.bar{height:8px;background:var(--panel);border-radius:4px;overflow:hidden}
+.bar>i{display:block;height:100%;width:0;background:var(--blue);transition:width .15s}
+#bossbar{display:none}#bossbar>i{background:var(--red)}
+#btnPause{pointer-events:auto;background:var(--panel2);color:var(--ink);border:1px solid var(--panel2);border-radius:10px;padding:6px 10px;font:800 13px var(--body)}
+#btnAttr{pointer-events:auto;background:var(--gold);color:#241a06;border:0;border-radius:10px;padding:6px 10px;font:800 13px var(--body)}
+.modal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(10,14,12,.78);padding:16px max(16px,env(safe-area-inset-right,0px)) 16px max(16px,env(safe-area-inset-left,0px));z-index:5}
+.box{width:100%;max-width:420px;background:var(--panel);border:1px solid var(--panel2);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:12px;max-height:90%;overflow:auto}
+h1,h2{font-family:var(--display);margin:0;text-wrap:balance;color:var(--gold)}
+h1{font-size:30px;text-align:center}h2{font-size:21px}
+p{margin:0;color:var(--muted);line-height:1.45}
+.card{display:flex;gap:10px;align-items:center;background:var(--panel2);border:2px solid transparent;border-radius:12px;padding:10px;cursor:pointer;text-align:left;color:var(--ink);font:inherit;width:100%}
+.card:focus-visible,.btn:focus-visible{outline:2px solid var(--gold)}
+.card.off{opacity:.45;cursor:not-allowed}
+.card .ic{font-family:var(--display);width:42px;height:42px;flex:none;border-radius:10px;display:grid;place-items:center;font-size:18px;color:#1a1306;background:var(--gold)}
+.card .tx{flex:1;min-width:0}.card b{display:block}.card small{color:var(--muted)}
+.card .pr{font-weight:800;color:var(--gold);font-variant-numeric:tabular-nums;white-space:nowrap}
+.tag{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.btn{background:var(--gold);color:#241a06;border:0;border-radius:12px;padding:12px;font:800 16px var(--body);cursor:pointer}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--panel2)}
+#mStart{background:var(--night)}
+#hubInfo{color:var(--ink);font-weight:700;text-align:center}
+#toast{position:fixed;left:50%;top:40%;transform:translateX(-50%);font:700 22px var(--display);color:var(--gold);text-shadow:0 2px 8px #000;pointer-events:none;opacity:0;transition:opacity .3s;text-align:center;width:90%}
+@media (prefers-reduced-motion:reduce){.bar>i{transition:none}}
+</style>
+
+<canvas id="c"></canvas>
+<div id="hud">
+  <div class="row">
+    <span class="hearts" id="hearts"></span>
+    <span class="pill" id="phase">Fase 1 · Onda 1/5</span>
+    <span class="pill gold" id="gold">0 gold</span>
+  </div>
+  <div class="row"><div class="bar" style="flex:1"><i id="xp"></i></div><span class="pill" id="lvl">Nv 1</span><button id="btnPause" aria-label="Pausar">II</button></div>
+  <div class="bar" id="bossbar"><i id="bosshp"></i></div>
+</div>
+<div id="toast"></div>
+
+<div class="modal" id="mStart"><div class="box">
+  <h1>Arqueiro da Muralha</h1>
+  <p>Arraste o dedo (ou use WASD / setas) para mover o arqueiro em qualquer direção. O arqueiro atira sozinho. Não deixe os monstros chegarem até você.</p>
+  <p>Cada fase começa do zero: nível, cartas e evoluções de arma valem só naquela fase. O que fica para sempre é o que você compra na Loja: atributos e armas. Se perder, o gold volta ao que era no começo da fase.</p>
+  <p id="hubInfo"></p>
+  <button class="btn" id="btnStart">Jogar</button>
+  <button class="btn ghost" id="btnArms">Armas</button>
+  <button class="btn ghost" id="btnShop">Loja</button>
+  <button class="btn ghost" id="btnQuit">Sair</button>
+  <p class="tag">Protótipo · formas simples no lugar da arte</p>
+</div></div>
+<div class="modal" id="mCards" hidden><div class="box">
+  <h2 id="cardsTitle">Subiu de nível!</h2>
+  <p>Escolha uma carta ou pule para guardar o gold.</p>
+  <div id="cardList" style="display:flex;flex-direction:column;gap:8px"></div>
+  <button class="btn ghost" id="btnSkip">Pular e guardar gold</button>
+</div></div>
+<div class="modal" id="mAttr" hidden><div class="box">
+  <h2>Loja</h2>
+  <p class="gold" id="attrGold"></p>
+  <p class="tag">Armas: caras, mas ficam para sempre. Depois de comprar, equipe na aba Armas.</p>
+  <div id="weapList" style="display:flex;flex-direction:column;gap:8px"></div>
+  <p class="tag">Atributos: cada compra custa 5 gold a mais</p>
+  <div id="attrList" style="display:flex;flex-direction:column;gap:8px"></div>
+  <button class="btn" id="btnAttrClose">Voltar ao menu</button>
+</div></div>
+<div class="modal" id="mQuit" hidden style="background:var(--night)"><div class="box">
+  <h2>Até a próxima!</h2>
+  <p>Seu progresso foi salvo. No app da Play Store este botão fecha o jogo; aqui no navegador, é só fechar a aba. Quando voltar, continua de onde parou.</p>
+  <button class="btn ghost" id="btnQuitBack">Voltar ao menu</button>
+</div></div>
+<div class="modal" id="mArms" hidden><div class="box">
+  <h2>Armas</h2>
+  <p>Suas armas compradas. Equipe a que quiser levar para a próxima fase.</p>
+  <div id="armsList" style="display:flex;flex-direction:column;gap:8px"></div>
+  <button class="btn" id="btnArmsClose">Voltar ao menu</button>
+</div></div>
+<div class="modal" id="mPause" hidden><div class="box">
+  <h2>Pausado</h2>
+  <p id="pauseInfo"></p>
+  <button class="btn" id="pResume">Continuar</button>
+  <button class="btn ghost" id="pSound">Som: ligado</button>
+  <button class="btn ghost" id="pRestart">Reiniciar fase</button>
+  <button class="btn ghost" id="pMenu">Sair para o menu</button>
+  <p class="tag">No computador: Esc ou P pausa</p>
+</div></div>
+<div class="modal" id="mMsg" hidden><div class="box">
+  <h2 id="msgTitle"></h2><p id="msgText"></p>
+  <button class="btn" id="btnMsg">Continuar</button>
+</div></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(()=>{
+const $=id=>document.getElementById(id);
+const PZ=2, SPAWNZ=31, HALF=4.6;
+
+// ---------- dados ----------
+const CARDS=[
+ {id:'dupla',n:'Flecha dupla',t:'Arma',d:'+1 flecha por tiro',p:60,ic:'II'},
+ {id:'perf',n:'Flecha perfurante',t:'Arma',d:'Atravessa +2 inimigos',p:70,ic:'→'},
+ {id:'fogo',n:'Flecha de fogo',t:'Arma',d:'Queima por 3 s',p:80,ic:'F'},
+ {id:'gelo',n:'Flecha de gelo',t:'Arma',d:'Inimigo 40% mais lento',p:80,ic:'G',u:1},
+ {id:'raio',n:'Cajado de raio',t:'Arma nova',d:'Raio pula entre 3 inimigos',p:150,ic:'R',u:1},
+ {id:'ima',n:'Ímã',t:'Passiva',d:'Puxa bônus de longe',p:50,ic:'Í',u:1},
+ {id:'sorte',n:'Sorte',t:'Passiva',d:'+25% de gold',p:70,ic:'$'},
+ {id:'esc',n:'Escudo',t:'Passiva',d:'Bloqueia 1 toque a cada 30 s',p:90,ic:'E',u:1},
+ {id:'chuva',n:'Chuva de flechas',t:'Especial',d:'A cada 15 s, dano na tela toda',p:130,ic:'≡',u:1},
+];
+const ATTRS=[
+ {id:'dmg',n:'Dano',d:'+10% de dano'},
+ {id:'atk',n:'Velocidade de ataque',d:'+8% de tiros'},
+ {id:'mov',n:'Velocidade de movimento',d:'+6%'},
+ {id:'vida',n:'Vida',d:'+1 coração'},
+ {id:'xp',n:'Ganho de XP',d:'+10% de XP'},
+];
+const ETYPES={
+ goblin:{hp:3,sp:2.2,r:.55,col:0x6fae4a,xp:1,g:4,shape:'box'},
+ lobo:{hp:2,sp:4.0,r:.5,col:0x9a9a9a,xp:1,g:4,shape:'cone'},
+ golem:{hp:10,sp:1.2,r:.8,col:0x7d6a55,xp:3,g:10,shape:'box'},
+ morcego:{hp:2,sp:2.6,r:.45,col:0x8a5cc4,xp:1,g:4,shape:'sph',fly:1},
+ ogro:{hp:45,sp:.75,r:1.4,col:0xc44a3a,xp:12,g:60,shape:'box',boss:1},
+};
+// Eras: os inimigos evoluem junto com as armas (comum, rápido, tanque, voador, chefe).
+const E=(n,col,shape)=>({n,col,shape});
+const ERAS=[
+ {n:'Fantasia',ground:0x2c4a2e,lane:0x5b5a4c,goblin:E('Goblin',0x6fae4a,'box'),lobo:E('Lobo',0x9a9a9a,'cone'),golem:E('Golem',0x7d6a55,'box'),morcego:E('Morcego',0x8a5cc4,'sph'),ogro:E('Ogro',0xc44a3a,'box')},
+ {n:'Piratas',ground:0xb89f68,lane:0x7a5a38,goblin:E('Pirata',0xb23a3a,'box'),lobo:E('Cão do mar',0x6b5a4a,'cone'),golem:E('Brutamontes',0x5a3d2b,'box'),morcego:E('Papagaio',0x2fbf5a,'sph'),ogro:E('Capitão Barba-Ruiva',0x8b1e1e,'box')},
+ {n:'Guerra',ground:0x4b5a3a,lane:0x4a4a46,goblin:E('Soldado',0x6b7a4a,'box'),lobo:E('Moto',0x333333,'cone'),golem:E('Tanque',0x55623a,'cyl'),morcego:E('Drone',0x888888,'oct'),ogro:E('General Blindado',0x3e4a2a,'cyl')},
+ {n:'Robôs',ground:0x2a2f3a,lane:0x50586a,goblin:E('Robô',0x9aa6b2,'box'),lobo:E('Robô-roda',0xd0a040,'sph'),golem:E('Mecha',0x5a6a80,'box'),morcego:E('Drone laser',0xff5050,'oct'),ogro:E('Robô Gigante',0x7a8aa0,'box')},
+ {n:'Invasão alienígena',ground:0x1d1430,lane:0x3a2a55,goblin:E('Alien',0x6cff8a,'sph'),lobo:E('Alien veloz',0x40e0d0,'cone'),golem:E('Alien blindado',0x8a40c0,'oct'),morcego:E('Disco voador',0xc0c0d0,'disc'),ogro:E('Nave-mãe',0x9050ff,'disc')},
+];
+const era=()=>ERAS[Math.min(Math.floor((S.phase-1)/5),ERAS.length-1)];
+// Sons sintetizados (sem arquivos), liberados após o toque em Jogar.
+let AC=null,muted=false,lastShot=0;
+function sfx(k){if(muted||!AC)return;const t=AC.currentTime;
+  if(k==='shot'){if(t-lastShot<.09)return;lastShot=t;}
+  const P={shot:[880,440,.05,'square',.03],hit:[220,110,.06,'triangle',.05],kill:[520,180,.12,'sawtooth',.05],hurt:[160,60,.3,'sawtooth',.12],
+    level:[520,1040,.25,'triangle',.08],bonus:[700,1400,.15,'sine',.08],win:[392,784,.5,'triangle',.1],boss:[90,60,.6,'sawtooth',.12]}[k];
+  const o=AC.createOscillator(),g=AC.createGain();o.type=P[3];o.frequency.setValueAtTime(P[0],t);o.frequency.exponentialRampToValueAtTime(P[1],t+P[2]);
+  g.gain.setValueAtTime(P[4],t);g.gain.exponentialRampToValueAtTime(.0001,t+P[2]);o.connect(g).connect(AC.destination);o.start(t);o.stop(t+P[2]+.02);}
+
+// ---------- estado ----------
+let S, snap, run=null;
+// Escada de armas: cada evolução libera numa fase e aparece como carta garantida ao subir de nível.
+const WEAPONS=[
+ {n:'Arco e flecha',dmg:1,rate:1,col:0xf3e2b0,size:1,speed:24},
+ {n:'Besta',d:'Virotes pesados: 2,5x dano, tiro mais lento',dmg:2.5,rate:.6,ph:1,p:120,shop:150,col:0xb9895a,size:1.2,speed:28},
+ {n:'Mosquete',d:'Bala de chumbo: 5x dano, atravessa 1 inimigo',dmg:5,rate:.45,ph:2,p:160,shop:300,col:0xdddddd,size:1.3,speed:40,pierce:1},
+ {n:'Metralhadora',d:'Chuva de balas: 3x mais tiros',dmg:1.6,rate:3,ph:3,p:200,shop:500,col:0xffd060,size:.8,speed:45},
+ {n:'Lança-foguetes',d:'Foguetes que explodem em área',dmg:6,rate:.5,ph:4,p:260,shop:800,col:0xff7a30,size:2.2,speed:18,boom:2.4},
+ {n:'Canhão laser',d:'Raio que atravessa tudo na frente',dmg:4,rate:2.2,ph:5,p:320,shop:1200,col:0xff3355,size:1.8,speed:70,pierce:99},
+];
+function fresh(){return {phase:1,gold:0,xp:0,lvl:1,weapon:0,baseWeapon:0,owned:[0],helper:false,helperOn:false,baby:false,babyOn:false,attrs:{dmg:0,atk:0,mov:0,vida:0,xp:0},cards:{}};}
+const clone=o=>JSON.parse(JSON.stringify(o));
+// Permanente: fase, gold, atributos e arma comprada na Loja. Temporário (só dentro da fase): XP, nível, cartas e evoluções de arma.
+function resetPhaseStuff(){S.lvl=1;S.xp=0;S.cards={};S.weapon=S.baseWeapon||0;}
+function stats(){
+  const a=S.attrs,c=S.cards,W=WEAPONS[S.weapon||0];
+  return {W, dmg:(1+.1*a.dmg)*W.dmg, rate:1.6*(1+.08*a.atk)*W.rate, mov:9*(1+.06*a.mov),
+    maxH:3+a.vida, xpm:1+.1*a.xp, shots:1+(c.dupla||0), pierce:2*(c.perf||0)+(W.pierce||0), fogo:c.fogo||0,
+    gelo:!!c.gelo, raio:!!c.raio, ajud:!!(S.helper&&S.helperOn), cav:!!c.cav, ima:!!c.ima, goldm:1+.25*(c.sorte||0), esc:!!c.esc, chuva:!!c.chuva};
+}
+const xpNeed=l=>Math.round(10*Math.pow(1.2,l-1));
+const attrCost=n=>5*(n+1);
+const cardCost=c=>Math.round(c.p*.4*Math.pow(1.25,S.phase-1));
+
+// ---------- three ----------
+const renderer=new THREE.WebGLRenderer({canvas:$('c'),antialias:true});
+renderer.setPixelRatio(Math.min(2,devicePixelRatio));
+const scene=new THREE.Scene(); scene.background=new THREE.Color(0x141a17); scene.fog=new THREE.Fog(0x141a17,40,70);
+const cam=new THREE.PerspectiveCamera(55,1,.1,200); cam.position.set(0,32,-4); cam.lookAt(0,0,11);
+scene.add(new THREE.HemisphereLight(0xdfeee0,0x2a3326,.85));
+const sun=new THREE.DirectionalLight(0xffefd0,.8); sun.position.set(-8,20,6); scene.add(sun);
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(40,60),new THREE.MeshLambertMaterial({color:0x2c4a2e}));
+ground.rotation.x=-Math.PI/2; ground.position.z=17; scene.add(ground);
+const lane=new THREE.Mesh(new THREE.PlaneGeometry(HALF*2+1.4,34),new THREE.MeshLambertMaterial({color:0x5b5a4c}));
+lane.rotation.x=-Math.PI/2; lane.position.set(0,.01,17); scene.add(lane);
+// muralha atrás do jogador
+const wall=new THREE.Mesh(new THREE.BoxGeometry(HALF*2+3,1.6,1),new THREE.MeshLambertMaterial({color:0x8b8574}));
+wall.position.set(0,.8,PZ-1.3); scene.add(wall);
+for(let i=-5;i<=5;i+=2){const m=new THREE.Mesh(new THREE.BoxGeometry(.9,.7,1),wall.material);m.position.set(i,1.95,PZ-1.3);scene.add(m);}
+// árvores decorativas
+for(let i=0;i<26;i++){const s=i%2?-1:1,t=new THREE.Mesh(new THREE.ConeGeometry(.9,2.4,6),new THREE.MeshLambertMaterial({color:0x22402a}));
+  t.position.set(s*(HALF+2.2+Math.random()*4),1.2,2+Math.random()*32);scene.add(t);}
+
+function mkArcher(col){const g=new THREE.Group();
+  const b=new THREE.Mesh(new THREE.CylinderGeometry(.42,.5,1.2,10),new THREE.MeshLambertMaterial({color:col})); b.position.y=.6; g.add(b);
+  const h=new THREE.Mesh(new THREE.SphereGeometry(.34,12,10),new THREE.MeshLambertMaterial({color:0xf0c9a0})); h.position.y=1.45; g.add(h);
+  const bow=new THREE.Mesh(new THREE.TorusGeometry(.45,.05,6,16,Math.PI),new THREE.MeshLambertMaterial({color:0x8a5a2b})); bow.position.set(0,.9,.45); bow.rotation.set(Math.PI/2,0,Math.PI/2); g.add(bow);
+  scene.add(g); return g;}
+const player=mkArcher(0x3f9cff); player.position.set(0,0,PZ); player.scale.setScalar(1.4);
+let helper=null, knight=null;
+const shieldMesh=new THREE.Mesh(new THREE.SphereGeometry(1,16,12),new THREE.MeshBasicMaterial({color:0x7fc8ff,transparent:true,opacity:.22}));
+shieldMesh.position.y=.8; player.add(shieldMesh);
+
+const geo={box:new THREE.BoxGeometry(1,1,1),cone:new THREE.ConeGeometry(.6,1.2,8),sph:new THREE.SphereGeometry(.6,12,10),cyl:new THREE.CylinderGeometry(.55,.55,.8,12),oct:new THREE.OctahedronGeometry(.65),disc:new THREE.CylinderGeometry(.75,.75,.25,18)};
+const arrowGeo=new THREE.CylinderGeometry(.05,.05,.9,6); arrowGeo.rotateX(Math.PI/2);
+const arrowMat=new THREE.MeshBasicMaterial({color:0xf3e2b0}), arrowGoldMat=new THREE.MeshBasicMaterial({color:0xffc94a});
+const BON={cora:{col:0xe2574c,n:'+1 coração'},ouro:{col:0xe8b14a,n:'+30 gold'},flecha:{col:0xfff1a0,n:'Tiro triplo!'},relogio:{col:0x5aa2e8,n:'Inimigos lentos!'}};
+
+// ---------- partida ----------
+function clearWorld(){ if(!run) return; [...run.en,...run.ar,...run.bo,...run.fx].forEach(o=>scene.remove(o.m)); }
+function startPhase(keep){
+  const pend=keep&&run?run.pendingLv:0;
+  clearWorld();
+  resetPhaseStuff();
+  snap=clone(S);
+  const st=stats();
+  run={t:0,wave:1,toSpawn:waveCount(1),spawnT:0,waveGap:0,boss:null,bossSpawned:false,en:[],ar:[],bo:[],fx:[],
+    hp:st.maxH,fireT:0,helpT:0,babyT:1,bonT:5,rainT:15,shieldT:0,shield:st.esc,triple:0,slowAll:0,pendingLv:pend,done:false};
+  player.position.x=0; player.position.z=PZ; targetX=0; targetZ=PZ;
+  ground.material.color.setHex(era().ground); lane.material.color.setHex(era().lane);
+  syncUnits(); hud(); toast('Fase '+S.phase+': '+era().n);
+}
+function waveCount(w){return 6+2*w+2*(S.phase-1);}
+function waveInterval(){return Math.max(.32,1.25-.08*S.phase-.05*run.wave);}
+function pickType(){const w=run.wave,p=S.phase,pool=['goblin','goblin'];
+  if(w>=2||p>1)pool.push('lobo'); if(w>=3||p>1)pool.push('morcego'); if(w>=4||p>1)pool.push('golem'); return pool[Math.random()*pool.length|0];}
+function spawn(type,x,z){
+  const T=ETYPES[type],V=era()[type],sc=(1+.3*(S.phase-1))*(S.phase===1?.5:1),m=new THREE.Mesh(geo[V.shape],new THREE.MeshLambertMaterial({color:V.col}));
+  const s=T.r*2; m.scale.set(s,s,s); if(V.shape==='cone'){m.rotation.x=-Math.PI/2;}
+  m.position.set(x??(Math.random()*2-1)*HALF, T.fly?1.4:T.r, z??SPAWNZ); scene.add(m);
+  const e={m,type,T,hp:T.hp*sc,max:T.hp*sc,sp:T.sp*(1+.1*(S.phase-1)),r:T.r,x0:m.position.x,ph:Math.random()*6,burn:0,burnD:0,slow:0,sumT:4};
+  run.en.push(e); if(T.boss) run.boss=e; return e;
+}
+function nearest(x,z){let b=null,bd=1e9;for(const e of run.en){const d=(e.m.position.x-x)**2+(e.m.position.z-z)**2;if(d<bd){bd=d;b=e;}}return b;}
+const wMats={};
+// half=true: tiro do Ajudante (tudo pela metade)
+function shoot(from,dmg,count,gold,half){
+  const st=stats(),W=st.W,mat=gold?arrowGoldMat:(wMats[W.col]||(wMats[W.col]=new THREE.MeshBasicMaterial({color:W.col})));
+  const tgt=nearest(from.x,from.z); let ang=0;
+  if(tgt){ang=Math.atan2(tgt.m.position.x-from.x,tgt.m.position.z-from.z);}
+  for(let i=0;i<count;i++){const a=ang+(i-(count-1)/2)*.14;
+    const m=new THREE.Mesh(arrowGeo,mat); m.scale.set(W.size*1.4,W.size*1.4,W.size); m.position.set(from.x,1,from.z+.5); m.rotation.y=a; scene.add(m);
+    if(i===0)sfx('shot');
+    run.ar.push({m,vx:Math.sin(a)*W.speed,vz:Math.cos(a)*W.speed,dmg,pierce:half?Math.floor(st.pierce/2):st.pierce,boom:W.boom||0,half:!!half,hit:new Set()});}
+}
+function hurt(e,d){e.hp-=d; e.m.material.emissive&&e.m.material.emissive.setHex(0x553322); e.flash=.08;}
+function kill(e){
+  sfx('kill'); scene.remove(e.m); run.en.splice(run.en.indexOf(e),1);
+  const st=stats(); S.gold+=Math.round(e.T.g*st.goldm); gainXp(e.T.xp*st.xpm);
+  if(e===run.boss){run.boss=null; phaseWon();}
+}
+function gainXp(v){S.xp+=v; while(S.xp>=xpNeed(S.lvl)){S.xp-=xpNeed(S.lvl);S.lvl++;run.pendingLv++;sfx('level');}
+  if(run.pendingLv&&!paused())showCards();}
+function lightning(a,b){const g=new THREE.BufferGeometry().setFromPoints([a.clone().setY(1),b.clone().setY(1)]);
+  const l=new THREE.Line(g,new THREE.LineBasicMaterial({color:0x9fd8ff})); scene.add(l); run.fx.push({m:l,life:.15});}
+function hitEnemy(e,ar){
+  const st=stats(); hurt(e,ar.dmg);
+  if(ar.boom){for(const o of run.en){if(o!==e&&o.m.position.distanceTo(e.m.position)<ar.boom)hurt(o,ar.dmg*.6);}
+    const b=new THREE.Mesh(new THREE.SphereGeometry(ar.boom,14,10),new THREE.MeshBasicMaterial({color:ar.fixed?0xff7ad9:0xff9a40,transparent:true,opacity:.45}));
+    b.position.copy(e.m.position);scene.add(b);run.fx.push({m:b,life:.18});}
+  if(ar.fixed)return; // glitter do bebê: dano fixo, sem cartas nem atributos
+  if(st.fogo){e.burn=3;e.burnD=.5*st.dmg*st.fogo*(ar.half?.5:1);}
+  if(st.gelo){e.slow=2;e.slowF=ar.half?.8:.6;}
+  if(st.raio){let n=0;const mx=ar.half?1:3;for(const o of run.en){if(o===e||n>=mx)continue;if(o.m.position.distanceTo(e.m.position)<4.5){hurt(o,ar.dmg*.6);lightning(e.m.position,o.m.position);n++;}}}
+}
+function loseHeart(){
+  if(run.shield){run.shield=false;run.shieldT=30;toast('Escudo bloqueou!');return;}
+  run.hp--; flash(0xe2574c); sfx('hurt');
+  if(run.hp<=0){run.done=true; msg('Você foi alcançado!','Você volta ao menu com o que tinha no começo da fase '+S.phase+'.',()=>{S=clone(snap);carry=false;$('mCards').hidden=true;showHub();});}
+}
+function phaseWon(){run.done=true; const g=Math.round(25*S.phase*stats().goldm); S.gold+=g;
+  msg('Fase '+S.phase+' concluída!','Você ganhou '+g+' gold de recompensa. Nível, cartas e evoluções de arma ficam para trás; gold, atributos e armas da Loja continuam com você.',()=>{S.phase++;carry=true;showHub();});}
+// Bebê do Glitter: dano fixo (BABY), não usa atributos nem cartas.
+const BABY={dmg:5,every:1.2,balls:3,boom:1.6,speed:14};
+let baby=null;
+const glitterMats=[0xff7ad9,0xffd84a,0x9be7ff,0xc58bff].map(c=>new THREE.MeshBasicMaterial({color:c}));
+const glitterGeo=new THREE.OctahedronGeometry(.22);
+function mkBaby(){const g=new THREE.Group();
+  const body=new THREE.Mesh(new THREE.SphereGeometry(.42,12,10),new THREE.MeshLambertMaterial({color:0xffb6d9}));body.position.y=.45;g.add(body);
+  const h=new THREE.Mesh(new THREE.SphereGeometry(.36,12,10),new THREE.MeshLambertMaterial({color:0xf6d2b4}));h.position.y=1.05;g.add(h);
+  const hat=new THREE.Mesh(new THREE.ConeGeometry(.2,.4,8),new THREE.MeshLambertMaterial({color:0xffd84a,emissive:0x664400}));hat.position.y=1.5;g.add(hat);
+  scene.add(g);return g;}
+function throwGlitter(from){const tgt=nearest(from.x,from.z);let ang=0;
+  if(tgt)ang=Math.atan2(tgt.m.position.x-from.x,tgt.m.position.z-from.z);
+  for(let i=0;i<BABY.balls;i++){const a=ang+(i-1)*.18,m=new THREE.Mesh(glitterGeo,glitterMats[(Math.random()*4)|0]);
+    m.position.set(from.x,1,from.z+.4);scene.add(m);
+    run.ar.push({m,vx:Math.sin(a)*BABY.speed,vz:Math.cos(a)*BABY.speed,dmg:BABY.dmg,pierce:0,boom:BABY.boom,fixed:true,hit:new Set()});}
+  sfx('bonus');}
+function syncUnits(){const st=stats();
+  const wantBaby=!!(S.baby&&S.babyOn); if(wantBaby&&!baby)baby=mkBaby(); if(!wantBaby&&baby){scene.remove(baby);baby=null;}
+  if(st.ajud&&!helper){helper=mkArcher(0x4fa07a);} if(!st.ajud&&helper){scene.remove(helper);helper=null;}
+  if(st.cav&&!knight){knight=new THREE.Group();const b=new THREE.Mesh(new THREE.BoxGeometry(1.1,1.4,.6),new THREE.MeshLambertMaterial({color:0xb8c0c8}));b.position.y=.7;knight.add(b);
+    const s=new THREE.Mesh(new THREE.BoxGeometry(1.5,1,.15),new THREE.MeshLambertMaterial({color:0x8a3a2a}));s.position.set(0,.8,.4);knight.add(s);scene.add(knight);}
+  if(!st.cav&&knight){scene.remove(knight);knight=null;}
+  shieldMesh.visible=!!(run&&run.shield);
+}
+
+// ---------- controle ----------
+const ZMAX=PZ+10; let targetX=0,targetZ=PZ,drag=null; const keys={};
+addEventListener('pointerdown',e=>{if(e.target.closest('.modal,button'))return;drag={x:e.clientX,y:e.clientY,px:player.position.x,pz:player.position.z};});
+addEventListener('pointermove',e=>{if(!drag)return;const w=Math.min(innerWidth,600);targetX=Math.max(-HALF,Math.min(HALF,drag.px-(e.clientX-drag.x)/w*13));targetZ=Math.max(PZ,Math.min(ZMAX,drag.pz-(e.clientY-drag.y)/w*13));});
+addEventListener('pointerup',()=>drag=null); addEventListener('pointercancel',()=>drag=null);
+addEventListener('keydown',e=>keys[e.key.length==1?e.key.toLowerCase():e.key]=1); addEventListener('keyup',e=>keys[e.key.length==1?e.key.toLowerCase():e.key]=0);
+
+// ---------- loop ----------
+let last=performance.now();
+function paused(){return !$('mArms').hidden||!$('mPause').hidden||!$('mCards').hidden||!$('mAttr').hidden||!$('mMsg').hidden||!$('mStart').hidden;}
+function step(dt){
+  const st=stats(); run.t+=dt;
+  // movimento
+  if(keys.ArrowRight||keys.d)targetX=Math.max(-HALF,targetX-st.mov*dt); if(keys.ArrowLeft||keys.a)targetX=Math.min(HALF,targetX+st.mov*dt);
+  if(keys.ArrowUp||keys.w)targetZ=Math.min(ZMAX,targetZ+st.mov*dt); if(keys.ArrowDown||keys.s)targetZ=Math.max(PZ,targetZ-st.mov*dt);
+  {const dx=targetX-player.position.x,dz=targetZ-player.position.z,dl=Math.hypot(dx,dz),mv=Math.min(dl,st.mov*dt);
+   if(dl>1e-4){player.position.x+=dx/dl*mv;player.position.z+=dz/dl*mv;}}
+  const PPZ=player.position.z;
+  if(baby){baby.position.set(Math.max(-HALF,Math.min(HALF,player.position.x+(player.position.x<-2?1.3:-1.3))),0,PPZ+.2);baby.children.forEach(c=>c.rotation.y+=dt*4);}
+  if(helper)helper.position.set(Math.max(-HALF,Math.min(HALF,player.position.x+(player.position.x>2?-1.3:1.3))),0,PPZ+.2);
+  if(knight)knight.position.set(player.position.x,0,PPZ+4.2);
+  // ondas
+  if(!run.bossSpawned){
+    if(run.toSpawn>0){run.spawnT-=dt;if(run.spawnT<=0){spawn(pickType());run.toSpawn--;run.spawnT=waveInterval();}}
+    else if(run.en.length===0||(run.waveGap+=dt)>5){
+      run.waveGap=0; if(run.wave<5){run.wave++;run.toSpawn=waveCount(run.wave);toast('Onda '+run.wave);}
+      else if(run.en.length===0){run.bossSpawned=true;spawn('ogro',0);toast('Chefe: '+era().ogro.n+'!');sfx('boss');}
+    }
+  }
+  // tiros
+  if(run.en.length){run.fireT-=dt;if(run.fireT<=0){run.fireT=1/st.rate;shoot(player.position,st.dmg,st.shots+(run.triple>0?2:0),run.triple>0);}
+    if(helper){run.helpT-=dt;if(run.helpT<=0){run.helpT=1/st.rate;shoot(helper.position,st.dmg*.5,Math.max(1,Math.floor((st.shots+(run.triple>0?2:0))/2)),run.triple>0,true);}}
+    if(baby){run.babyT-=dt;if(run.babyT<=0){run.babyT=BABY.every;throwGlitter(baby.position);}}}
+  run.triple=Math.max(0,run.triple-dt); run.slowAll=Math.max(0,run.slowAll-dt);
+  if(st.esc&&!run.shield){run.shieldT-=dt;if(run.shieldT<=0)run.shield=true;}
+  shieldMesh.visible=run.shield;
+  if(st.chuva){run.rainT-=dt;if(run.rainT<=0){run.rainT=15;flash(0xe8b14a);for(const e of [...run.en])hurt(e,st.dmg*2);toast('Chuva de flechas!');}}
+  // flechas
+  for(const a of [...run.ar]){a.m.position.x+=a.vx*dt;a.m.position.z+=a.vz*dt;
+    if(a.m.position.z>SPAWNZ+3||Math.abs(a.m.position.x)>HALF+3){scene.remove(a.m);run.ar.splice(run.ar.indexOf(a),1);continue;}
+    for(const e of run.en){if(a.hit.has(e))continue;const p=e.m.position;
+      if((p.x-a.m.position.x)**2+(p.z-a.m.position.z)**2<(e.r+.3)**2){a.hit.add(e);hitEnemy(e,a);
+        if(a.pierce--<=0){scene.remove(a.m);run.ar.splice(run.ar.indexOf(a),1);break;}}}}
+  // inimigos
+  for(const e of [...run.en]){
+    if(e.burn>0){e.burn-=dt;e.hp-=e.burnD*dt;}
+    if(e.slow>0)e.slow-=dt;
+    if(e.flash>0){e.flash-=dt;if(e.flash<=0)e.m.material.emissive.setHex(0);}
+    if(e.hp<=0){kill(e);if(run.done)return;continue;}
+    let sp=e.sp*(e.slow>0?(e.slowF||.6):1)*(run.slowAll>0?.5:1);
+    const p=e.m.position;
+    if(knight&&Math.abs(p.x-knight.position.x)<1.1+e.r&&Math.abs(p.z-knight.position.z)<.6+e.r){sp=0;e.hp-=st.dmg*dt;}
+    p.z-=sp*dt;
+    if(e.T.fly)p.x=Math.max(-HALF,Math.min(HALF,e.x0+Math.sin(run.t*3+e.ph)*1.6));
+    if(e.T.boss){e.sumT-=dt;if(e.sumT<=0){e.sumT=5;spawn('goblin',p.x-1.5,p.z+1);spawn('goblin',p.x+1.5,p.z+1);}}
+    if(p.z<=PZ+e.r||(Math.abs(p.x-player.position.x)<e.r+.6&&Math.abs(p.z-PPZ)<e.r+.6)){scene.remove(e.m);run.en.splice(run.en.indexOf(e),1);
+      if(e.T.boss){run.boss=null;run.hp=1;run.shield=false;} loseHeart(); if(run.done)return;}
+  }
+  // bônus
+  run.bonT-=dt; if(run.bonT<=0){run.bonT=6+Math.random()*4;const k=Object.keys(BON)[Math.random()*4|0];
+    const m=new THREE.Mesh(new THREE.OctahedronGeometry(.45),new THREE.MeshLambertMaterial({color:BON[k].col,emissive:BON[k].col,emissiveIntensity:.35}));
+    m.position.set((Math.random()*2-1)*HALF,.9,SPAWNZ);scene.add(m);run.bo.push({m,k});}
+  for(const b of [...run.bo]){const p=b.m.position;p.z-=3*dt;b.m.rotation.y+=3*dt;
+    if(st.ima&&p.z<14){p.x+=(player.position.x-p.x)*Math.min(1,3*dt);}
+    if(Math.abs(p.z-PPZ)<1.2&&Math.abs(p.x-player.position.x)<(st.ima?2.5:1.1)){scene.remove(b.m);run.bo.splice(run.bo.indexOf(b),1);
+      if(b.k==='cora')run.hp=Math.min(st.maxH,run.hp+1); if(b.k==='ouro')S.gold+=30; if(b.k==='flecha')run.triple=8; if(b.k==='relogio')run.slowAll=5; toast(BON[b.k].n);sfx('bonus');}
+    else if(p.z<PZ-1){scene.remove(b.m);run.bo.splice(run.bo.indexOf(b),1);}}
+  for(const f of [...run.fx]){f.life-=dt;if(f.life<=0){scene.remove(f.m);run.fx.splice(run.fx.indexOf(f),1);}}
+}
+function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;
+  if(run&&!run.done&&!paused())step(dt);
+  if(run)hud(); $('hud').style.visibility=(run&&$('mStart').hidden)?'visible':'hidden'; renderer.render(scene,cam); requestAnimationFrame(frame);}
+
+// ---------- UI ----------
+let fl=null;
+function flash(c){scene.background.setHex(c);clearTimeout(fl);fl=setTimeout(()=>scene.background.setHex(0x141a17),90);}
+let tt=null; function toast(t){const el=$('toast');el.textContent=t;el.style.opacity=1;clearTimeout(tt);tt=setTimeout(()=>el.style.opacity=0,1100);}
+function hud(){const st=stats();
+  $('hearts').textContent='♥'.repeat(Math.max(0,run.hp))+'♡'.repeat(Math.max(0,st.maxH-run.hp));
+  $('phase').textContent=run.bossSpawned?'Fase '+S.phase+' · Chefe':'Fase '+S.phase+' · Onda '+run.wave+'/5';
+  $('gold').textContent=S.gold+' gold'; $('lvl').textContent='Nv '+S.lvl+' · '+st.W.n;
+  $('xp').style.width=(100*S.xp/xpNeed(S.lvl))+'%';
+  $('bossbar').style.display=run.boss?'block':'none'; if(run.boss)$('bosshp').style.width=(100*run.boss.hp/run.boss.max)+'%';}
+function showCards(){
+  const avail=CARDS.filter(c=>!S.cards[c.id]); const pick=[]; // carta que você já tem não aparece de novo
+  const NW=WEAPONS[(S.weapon||0)+1];
+  if(NW&&S.phase>=NW.ph)pick.push({id:'_arma',n:'Evoluir: '+NW.n,t:'Evolução de arma',d:NW.d,p:NW.p,ic:'★'});
+  while(pick.length<3&&avail.length)pick.push(avail.splice(Math.random()*avail.length|0,1)[0]);
+  if(!pick.length){run.pendingLv=0;toast('Você já tem todas as cartas!');return;}
+  const newLv=S.lvl-run.pendingLv+1, free=newLv===2;
+  $('cardsTitle').textContent='Subiu para o nível '+newLv+'!'+(free?' Carta grátis':'');
+  const L=$('cardList');L.innerHTML='';
+  for(const c of pick){const cost=free?0:cardCost(c),ok=S.gold>=cost,b=document.createElement('button');b.className='card'+(ok?'':' off');
+    b.innerHTML=`<span class="ic">${c.ic}</span><span class="tx"><span class="tag">${c.t}</span><b>${c.n}</b><small>${c.d}</small></span><span class="pr">${cost?cost+' gold':'Grátis'}</span>`;
+    b.onclick=()=>{if(!ok){toast('Gold insuficiente');return;}S.gold-=cost;if(c.id==='_arma'){S.weapon=(S.weapon||0)+1;toast('Nova arma: '+WEAPONS[S.weapon].n);}else S.cards[c.id]=(S.cards[c.id]||0)+1;syncUnits();nextCard();};L.appendChild(b);}
+  $('mCards').hidden=false;
+}
+function nextCard(){run.pendingLv--;$('mCards').hidden=true;if(run.pendingLv>0)showCards();}
+$('btnSkip').onclick=nextCard;
+function showAttrs(){const L=$('attrList');L.innerHTML='';$('attrGold').textContent='Você tem '+S.gold+' gold.';
+  const WL=$('weapList');WL.innerHTML='';
+  S.owned=S.owned||[0];
+  if(WEAPONS.every((w,i)=>S.owned.includes(i)))WL.innerHTML='<p>Você já tem todas as armas.</p>';
+  WEAPONS.forEach((w,i)=>{if(S.owned.includes(i))return;const own=false,eq=i===(S.baseWeapon||0),ok=own?!eq:S.gold>=w.shop,b=document.createElement('button');b.className='card'+(ok||eq?'':' off');
+    b.innerHTML=`<span class="ic">${i}</span><span class="tx"><b>${w.n}</b><small>${w.d||'Arma inicial'}</small></span><span class="pr">${own?(eq?'Equipada':'Equipar'):w.shop+' gold'}</span>`;
+    b.onclick=()=>{if(eq)return;if(own){S.baseWeapon=i;S.weapon=i;toast('Equipada: '+w.n);showAttrs();return;}
+      if(!ok){toast('Gold insuficiente');return;}S.gold-=w.shop;S.owned.push(i);S.baseWeapon=i;S.weapon=i;toast('Nova arma: '+w.n);showAttrs();};WL.appendChild(b);});
+  if(!S.baby){const ok=S.gold>=1908,b=document.createElement('button');b.className='card'+(ok?'':' off');
+    b.innerHTML=`<span class="ic">✦</span><span class="tx"><span class="tag">Personagem</span><b>Bebê do Glitter</b><small>Joga glitter que explode em área. Dano fixo: não usa seus atributos nem cartas</small></span><span class="pr">1908 gold</span>`;
+    b.onclick=()=>{if(!ok){toast('Gold insuficiente');return;}S.gold-=1908;S.baby=true;S.babyOn=true;toast('Bebê do Glitter chegou!');showAttrs();};WL.appendChild(b);}
+  if(!S.helper){const ok=S.gold>=650,b=document.createElement('button');b.className='card'+(ok?'':' off');
+    b.innerHTML=`<span class="ic">A</span><span class="tx"><span class="tag">Personagem</span><b>Ajudante arqueiro</b><small>Igual ao seu arqueiro, mas tudo pela metade: dano, tiros, efeitos</small></span><span class="pr">650 gold</span>`;
+    b.onclick=()=>{if(!ok){toast('Gold insuficiente');return;}S.gold-=650;S.helper=true;S.helperOn=true;toast('Ajudante contratado!');showAttrs();};WL.appendChild(b);}
+  for(const a of ATTRS){const n=S.attrs[a.id],cost=attrCost(n),ok=S.gold>=cost,b=document.createElement('button');b.className='card'+(ok?'':' off');
+    b.innerHTML=`<span class="ic">${n}</span><span class="tx"><b>${a.n}</b><small>${a.d}</small></span><span class="pr">${cost} gold</span>`;
+    b.onclick=()=>{if(!ok){toast('Gold insuficiente');return;}S.gold-=cost;S.attrs[a.id]++;showAttrs();};L.appendChild(b);}
+  $('mAttr').hidden=false;}
+
+function openPause(){if(!run||run.done||paused())return;
+  $('pauseInfo').textContent='Fase '+S.phase+' ('+era().n+') · Nível '+S.lvl+' · '+stats().W.n+' · '+S.gold+' gold';
+  $('pSound').textContent='Som: '+(muted?'desligado':'ligado'); $('mPause').hidden=false;}
+$('btnPause').onclick=openPause;
+addEventListener('keydown',e=>{if(e.key==='Escape'||e.key==='p'||e.key==='P'){if(!$('mPause').hidden)$('mPause').hidden=true;else openPause();}});
+$('pResume').onclick=()=>{$('mPause').hidden=true;};
+$('pSound').onclick=()=>{muted=!muted;$('pSound').textContent='Som: '+(muted?'desligado':'ligado');};
+$('pRestart').onclick=()=>{$('mPause').hidden=true;$('mCards').hidden=true;S=clone(snap);startPhase();};
+$('pMenu').onclick=()=>{$('mPause').hidden=true;$('mCards').hidden=true;clearWorld();run=null;S=clone(snap);carry=false;showHub();};
+let carry=false;
+// Progresso salvo neste aparelho: sair e voltar continua de onde parou.
+const SAVE='arqueiro-save-v1';
+function save(){try{localStorage.setItem(SAVE,JSON.stringify(S));}catch(_){}}
+function load(){try{const v=JSON.parse(localStorage.getItem(SAVE));return v&&v.attrs?Object.assign(fresh(),v):null;}catch(_){return null;}}
+function showHub(){resetPhaseStuff();save();$('hubInfo').textContent='Fase '+S.phase+' ('+era().n+') · '+stats().W.n+' · '+S.gold+' gold';
+  $('btnStart').textContent='Jogar fase '+S.phase; $('mStart').hidden=false;}
+$('btnShop').onclick=showAttrs;
+function showArms(){const L=$('armsList');L.innerHTML='';S.owned=S.owned||[0];
+  S.owned.slice().sort((a,b)=>a-b).forEach(i=>{const w=WEAPONS[i],eq=i===(S.baseWeapon||0),b=document.createElement('button');b.className='card';
+    b.innerHTML=`<span class="ic">${i}</span><span class="tx"><b>${w.n}</b><small>${w.d||'Arma inicial'}</small></span><span class="pr">${eq?'Equipada':'Equipar'}</span>`;
+    b.onclick=()=>{S.baseWeapon=i;S.weapon=i;showArms();};L.appendChild(b);});
+  if(S.baby){const b=document.createElement('button');b.className='card';
+    b.innerHTML=`<span class="ic">✦</span><span class="tx"><span class="tag">Personagem</span><b>Bebê do Glitter</b><small>Glitter em área com dano fixo</small></span><span class="pr">${S.babyOn?'Levando':'Levar'}</span>`;
+    b.onclick=()=>{S.babyOn=!S.babyOn;showArms();};L.appendChild(b);}
+  if(S.helper){const b=document.createElement('button');b.className='card';
+    b.innerHTML=`<span class="ic">A</span><span class="tx"><span class="tag">Personagem</span><b>Ajudante arqueiro</b><small>Copia sua arma e cartas pela metade</small></span><span class="pr">${S.helperOn?'Levando':'Levar'}</span>`;
+    b.onclick=()=>{S.helperOn=!S.helperOn;showArms();};L.appendChild(b);}
+  $('mArms').hidden=false;}
+$('btnArms').onclick=showArms;
+$('btnArmsClose').onclick=()=>{$('mArms').hidden=true;showHub();};
+$('btnQuit').onclick=()=>{save();$('mQuit').hidden=false;try{window.close();}catch(_){}};
+$('btnQuitBack').onclick=()=>{$('mQuit').hidden=true;};
+$('btnAttrClose').onclick=()=>{$('mAttr').hidden=true;if(!$('mStart').hidden)showHub();};
+let msgCb=null; function msg(t,x,cb){$('msgTitle').textContent=t;$('msgText').textContent=x;msgCb=cb;$('mMsg').hidden=false;}
+$('btnMsg').onclick=()=>{$('mMsg').hidden=true;const c=msgCb;msgCb=null;c&&c();};
+$('btnStart').onclick=()=>{try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();AC.resume();}catch(_){}$('mStart').hidden=true;startPhase(false);carry=false;if(run.pendingLv)showCards();};
+
+function resize(){renderer.setSize(innerWidth,innerHeight);cam.aspect=innerWidth/innerHeight;
+  cam.fov=55; cam.updateProjectionMatrix();}
+addEventListener('resize',resize); resize();
+S=load()||fresh(); showHub(); requestAnimationFrame(frame);
+})();
+</script>
+
+</html>
