@@ -119,7 +119,7 @@ const CARDS=[
  {id:'gelo',n:'Flecha de gelo',t:'Arma',d:'Inimigo 40% mais lento',p:80,ic:'G',u:1},
  {id:'raio',n:'Cajado de raio',t:'Arma nova',d:'Raio pula entre 3 inimigos',p:150,ic:'R',u:1},
  {id:'ima',n:'Ímã',t:'Passiva',d:'Puxa bônus de longe',p:50,ic:'Í',u:1},
- {id:'sorte',n:'Sorte',t:'Passiva',d:'+25% de gold',p:70,ic:'$'},
+ {id:'sorte',n:'Sorte',t:'Passiva',d:'+25% de gold e 10% de chance de cada carta sair de graça',p:70,ic:'$'},
  {id:'esc',n:'Escudo',t:'Passiva',d:'Bloqueia 1 toque a cada 30 s',p:90,ic:'E',u:1},
  {id:'chuva',n:'Chuva de flechas',t:'Especial',d:'A cada 15 s, dano na tela toda',p:130,ic:'≡',u:1},
  {id:'rico',n:'Ricochete',t:'Arma',d:'O tiro quica nas paredes até 3 vezes',p:90,ic:'↯'},
@@ -433,8 +433,8 @@ function showCards(){
   const newLv=S.lvl-run.pendingLv+1, free=newLv===2;
   $('cardsTitle').textContent='Subiu para o nível '+newLv+'!'+(free?' Carta grátis':'');
   const L=$('cardList');L.innerHTML='';
-  for(const c of pick){const cost=free?0:cardCost(c),ok=S.gold>=cost,b=document.createElement('button');b.className='card'+(ok?'':' off');
-    b.innerHTML=`<span class="ic">${c.ic}</span><span class="tx"><span class="tag">${c.t}</span><b>${c.n}</b><small>${c.d}</small></span><span class="pr">${cost?cost+' gold':'Grátis'}</span>`;
+  for(const c of pick){const luck=!free&&S.cards.sorte&&Math.random()<.1,cost=free||luck?0:cardCost(c),ok=S.gold>=cost,b=document.createElement('button');b.className='card'+(ok?'':' off');
+    b.innerHTML=`<span class="ic">${c.ic}</span><span class="tx"><span class="tag">${c.t}</span><b>${c.n}</b><small>${c.d}</small></span><span class="pr">${cost?cost+' gold':(luck?'Grátis (Sorte)':'Grátis')}</span>`;
     b.onclick=()=>{if(!ok){toast('Gold insuficiente');return;}S.gold-=cost;if(c.id==='_arma'){S.weapon=(S.weapon||0)+1;toast('Nova arma: '+WEAPONS[S.weapon].n);}else S.cards[c.id]=(S.cards[c.id]||0)+1;syncUnits();nextCard();};L.appendChild(b);}
   $('mCards').hidden=false;
 }
