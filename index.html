@@ -125,6 +125,7 @@ const CARDS=[
  {id:'rico',n:'Ricochete',t:'Arma',d:'O tiro quica nas paredes até 3 vezes',p:90,ic:'↯'},
  {id:'crit',n:'Golpe crítico',t:'Arma',d:'20% de chance de 3x dano',p:80,ic:'!'},
  {id:'expl',n:'Flecha explosiva',t:'Arma',d:'Cada tiro explode numa área pequena',p:110,ic:'*'},
+ {id:'anjo',n:'Anjo da Guarda',t:'Passiva',d:'Se você for derrotado nesta fase, revive uma vez com 3 corações',p:120,ic:'✝'},
 ];
 const ATTRS=[
  {id:'dmg',n:'Dano',d:'+10% de dano'},
@@ -169,7 +170,7 @@ const WEAPONS=[
  {n:'Lança-foguetes',d:'Foguetes que explodem em área',dmg:6,rate:.5,ph:16,p:260,shop:800,col:0xff7a30,size:2.2,speed:18,boom:2.4},
  {n:'Canhão laser',d:'Raio que atravessa tudo na frente',dmg:4,rate:2.2,ph:21,p:320,shop:1200,col:0xff3355,size:1.8,speed:70,pierce:99},
 ];
-function fresh(){return {phase:1,gold:0,xp:0,lvl:1,weapon:0,baseWeapon:0,owned:[0],helper:false,helperOn:false,baby:false,babyOn:false,twin:false,twinOn:false,attrs:{dmg:0,atk:0,mov:0,vida:0,xp:0},cards:{}};}
+function fresh(){return {phase:1,gold:0,xp:0,lvl:1,weapon:0,baseWeapon:0,owned:[0],helper:false,helperOn:false,baby:false,babyOn:false,twin:false,twinOn:false,angel:0,attrs:{dmg:0,atk:0,mov:0,vida:0,xp:0},cards:{}};}
 const clone=o=>JSON.parse(JSON.stringify(o));
 // Permanente: fase, gold, atributos e arma comprada na Loja. Temporário (só dentro da fase): XP, nível, cartas e evoluções de arma.
 function resetPhaseStuff(){S.lvl=1;S.xp=0;S.cards={};S.weapon=S.baseWeapon||0;}
@@ -282,12 +283,22 @@ function hitEnemy(e,ar){
 function loseHeart(){
   if(run.shield){run.shield=false;run.shieldT=30;toast('Escudo bloqueou!');return;}
   run.hp--; flash(0xe2574c); sfx('hurt');
+  if(run.hp<=0&&revive())return;
   if(run.hp<=0){run.done=true; const k=Math.floor((run.earned||0)/2);
     msg('Você foi alcançado!','Você volta ao menu e fica com metade do gold que ganhou nesta fase: +'+k+' gold.',()=>{keepHalf();carry=false;$('mCards').hidden=true;showHub();});}
 }
 // Gold ganho na fase (inimigos, bônus). Se perder ou sair, fica com 50% dele.
 function addGold(v){S.gold+=v;if(run)run.earned=(run.earned||0)+v;}
-function keepHalf(){const k=Math.floor((run&&run.earned||0)/2);S=clone(snap);S.gold+=k;return k;}
+function keepHalf(){const k=Math.floor((run&&run.earned||0)/2),used=run&&run.angelShop;S=clone(snap);S.gold+=k;if(used)S.angel=Math.max(0,(S.angel||0)-1);return k;}
+// Anjo da Guarda: carta da fase (1 vez) ou da Loja (gasta 1). Revive com vida cheia e limpa a tela.
+function revive(){let from='';
+  if(S.cards.anjo&&!run.angelCard){run.angelCard=true;from='carta';}
+  else if((S.angel||0)>0){S.angel--;run.angelShop=true;from='loja';}
+  else return false;
+  const st=stats(); run.hp=st.maxH; sfx('level'); flash(0xfff3c4);
+  for(const e of [...run.en]){if(e!==run.boss){scene.remove(e.m);run.en.splice(run.en.indexOf(e),1);}}
+  if(run.bossHp){const b=spawn('ogro',0);b.hp=Math.min(b.max,run.bossHp);run.bossHp=0;}
+  toast('Anjo da Guarda: você reviveu!'+(from==='loja'?' (restam '+S.angel+')':''));save();return true;}
 function phaseWon(){run.done=true; const g=Math.round(25*S.phase*stats().goldm); S.gold+=g;
   msg('Fase '+S.phase+' concluída!','Você ganhou '+g+' gold de recompensa. Nível, cartas e evoluções de arma ficam para trás; gold, atributos e armas da Loja continuam com você.',()=>{S.phase++;carry=true;showHub();});}
 // Bebê do Glitter: dano fixo (BABY), não usa atributos nem cartas.
@@ -382,7 +393,7 @@ function step(dt){
     if(e.T.fly)p.x=Math.max(-HALF,Math.min(HALF,e.x0+Math.sin(run.t*3+e.ph)*1.6));
     if(e.T.boss){e.sumT-=dt;if(e.sumT<=0){e.sumT=5;spawn('goblin',p.x-1.5,p.z+1);spawn('goblin',p.x+1.5,p.z+1);}}
     if(p.z<=PZ+e.r||(Math.abs(p.x-player.position.x)<e.r+.6&&Math.abs(p.z-PPZ)<e.r+.6)){scene.remove(e.m);run.en.splice(run.en.indexOf(e),1);
-      if(e.T.boss){run.boss=null;run.hp=1;run.shield=false;} loseHeart(); if(run.done)return;}
+      if(e.T.boss){run.boss=null;run.bossHp=e.hp;run.hp=1;run.shield=false;} loseHeart(); if(run.done)return;}
   }
   // bônus
   run.bonT-=dt; if(run.bonT<=0){run.bonT=6+Math.random()*4;const k=Object.keys(BON)[Math.random()*4|0];
@@ -443,6 +454,9 @@ function showAttrs(){const L=$('attrList');L.innerHTML='';$('attrGold').textCont
   if(!S.twin){const ok=S.gold>=819,b=document.createElement('button');b.className='card'+(ok?'':' off');
     b.innerHTML=`<span class="ic">✧</span><span class="tx"><span class="tag">Personagem</span><b>Gêmeo 0819</b><small>O gêmeo menor: 2 bolinhas de glitter, 2 de dano cada, em área. Dano fixo</small></span><span class="pr">0819 gold</span>`;
     b.onclick=()=>{if(!ok){toast('Gold insuficiente');return;}S.gold-=819;S.twin=true;S.twinOn=true;toast('Gêmeo 0819 chegou!');showAttrs();};WL.appendChild(b);}
+  {const n=S.angel||0,ok=S.gold>=400&&n<1,b=document.createElement('button');b.className='card'+(ok?'':' off');
+    b.innerHTML=`<span class="ic">✝</span><span class="tx"><span class="tag">Item</span><b>Anjo da Guarda</b><small>Se você for derrotado, revive com 3 corações e a tela é limpa. Gasta ao usar. Máximo 1 guardado${n?' (você tem 1)':''}</small></span><span class="pr">${n?'Guardado':'400 gold'}</span>`;
+    b.onclick=()=>{if(n){toast('Você já tem um Anjo guardado');return;}if(!ok){toast('Gold insuficiente');return;}S.gold-=400;S.angel=1;toast('Anjo da Guarda guardado!');showAttrs();};WL.appendChild(b);}
   if(!S.helper){const ok=S.gold>=650,b=document.createElement('button');b.className='card'+(ok?'':' off');
     b.innerHTML=`<span class="ic">A</span><span class="tx"><span class="tag">Personagem</span><b>Ajudante arqueiro</b><small>Igual ao seu arqueiro, mas tudo pela metade: dano, tiros, efeitos</small></span><span class="pr">650 gold</span>`;
     b.onclick=()=>{if(!ok){toast('Gold insuficiente');return;}S.gold-=650;S.helper=true;S.helperOn=true;toast('Ajudante contratado!');showAttrs();};WL.appendChild(b);}
