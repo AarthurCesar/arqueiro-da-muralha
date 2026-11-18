@@ -265,7 +265,7 @@ function shoot(from,dmg,count,gold,half){
 function hurt(e,d){e.hp-=d; e.m.material.emissive&&e.m.material.emissive.setHex(0x553322); e.flash=.08;}
 function kill(e){
   sfx('kill'); scene.remove(e.m); run.en.splice(run.en.indexOf(e),1);
-  const st=stats(); S.gold+=Math.round(e.T.g*st.goldm*phaseGold()); gainXp(e.T.xp*st.xpm);
+  const st=stats(); addGold(Math.round(e.T.g*st.goldm*phaseGold())); gainXp(e.T.xp*st.xpm);
   if(st.vamp){run.kills=(run.kills||0)+1;if(run.kills%25===0&&run.hp<st.maxH){run.hp++;toast('Vampiro: +1 coração');}}
   if(e===run.boss){run.boss=null; phaseWon();}
 }
@@ -288,8 +288,12 @@ function hitEnemy(e,ar){
 function loseHeart(){
   if(run.shield){run.shield=false;run.shieldT=30;toast('Escudo bloqueou!');return;}
   run.hp--; flash(0xe2574c); sfx('hurt');
-  if(run.hp<=0){run.done=true; msg('Você foi alcançado!','Você volta ao menu com o que tinha no começo da fase '+S.phase+'.',()=>{S=clone(snap);carry=false;$('mCards').hidden=true;showHub();});}
+  if(run.hp<=0){run.done=true; const k=Math.floor((run.earned||0)/2);
+    msg('Você foi alcançado!','Você volta ao menu e fica com metade do gold que ganhou nesta fase: +'+k+' gold.',()=>{keepHalf();carry=false;$('mCards').hidden=true;showHub();});}
 }
+// Gold ganho na fase (inimigos, bônus). Se perder ou sair, fica com 50% dele.
+function addGold(v){S.gold+=v;if(run)run.earned=(run.earned||0)+v;}
+function keepHalf(){const k=Math.floor((run&&run.earned||0)/2);S=clone(snap);S.gold+=k;return k;}
 function phaseWon(){run.done=true; const g=Math.round(25*S.phase*stats().goldm); S.gold+=g;
   msg('Fase '+S.phase+' concluída!','Você ganhou '+g+' gold de recompensa. Nível, cartas e evoluções de arma ficam para trás; gold, atributos e armas da Loja continuam com você.',()=>{S.phase++;carry=true;showHub();});}
 // Bebê do Glitter: dano fixo (BABY), não usa atributos nem cartas.
@@ -389,8 +393,8 @@ function step(dt){
     if(st.ima&&p.z<14){p.x+=(player.position.x-p.x)*Math.min(1,3*dt);}
     if(Math.abs(p.z-PPZ)<1.2&&Math.abs(p.x-player.position.x)<(st.ima?2.5:1.1)){scene.remove(b.m);run.bo.splice(run.bo.indexOf(b),1);
       let msgB=BON[b.k].n;
-      if(b.k==='cora'){if(run.hp<st.maxH)run.hp++;else{S.gold+=250;msgB='Vida cheia: +250 gold';}}
-      if(b.k==='ouro')S.gold+=30; if(b.k==='flecha')run.triple=8; if(b.k==='relogio')run.slowAll=5; toast(msgB);sfx('bonus');}
+      if(b.k==='cora'){if(run.hp<st.maxH)run.hp++;else{addGold(250);msgB='Vida cheia: +250 gold';}}
+      if(b.k==='ouro')addGold(30); if(b.k==='flecha')run.triple=8; if(b.k==='relogio')run.slowAll=5; toast(msgB);sfx('bonus');}
     else if(p.z<PZ-1){scene.remove(b.m);run.bo.splice(run.bo.indexOf(b),1);}}
   for(const f of [...run.fx]){f.life-=dt;if(f.life<=0){scene.remove(f.m);run.fx.splice(run.fx.indexOf(f),1);}}
 }
@@ -452,8 +456,8 @@ $('btnPause').onclick=openPause;
 addEventListener('keydown',e=>{if(e.key==='Escape'||e.key==='p'||e.key==='P'){if(!$('mPause').hidden)$('mPause').hidden=true;else openPause();}});
 $('pResume').onclick=()=>{$('mPause').hidden=true;};
 $('pSound').onclick=()=>{muted=!muted;$('pSound').textContent='Som: '+(muted?'desligado':'ligado');};
-$('pRestart').onclick=()=>{$('mPause').hidden=true;$('mCards').hidden=true;S=clone(snap);startPhase();};
-$('pMenu').onclick=()=>{$('mPause').hidden=true;$('mCards').hidden=true;clearWorld();run=null;S=clone(snap);carry=false;showHub();};
+$('pRestart').onclick=()=>{$('mPause').hidden=true;$('mCards').hidden=true;const k=keepHalf();startPhase();if(k)toast('+'+k+' gold guardado');};
+$('pMenu').onclick=()=>{$('mPause').hidden=true;$('mCards').hidden=true;keepHalf();clearWorld();run=null;carry=false;showHub();};
 let carry=false;
 // Progresso salvo neste aparelho: sair e voltar continua de onde parou.
 const SAVE='arqueiro-save-v1';
