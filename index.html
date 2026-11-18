@@ -63,7 +63,7 @@ p{margin:0;color:var(--muted);line-height:1.45}
   <button class="btn ghost" id="btnArms">Armas</button>
   <button class="btn ghost" id="btnShop">Loja</button>
   <button class="btn ghost" id="btnQuit">Sair</button>
-  <div class="row" id="testBar" hidden><button class="btn ghost" id="tPrev">Fase -5</button><button class="btn ghost" id="tNext">Fase +5</button><button class="btn ghost" id="tGold">+1000 gold</button></div>
+  <div class="row" id="testBar" hidden><button class="btn ghost" id="tPrev">Fase -5</button><button class="btn ghost" id="tNext">Fase +5</button><button class="btn ghost" id="tNext50">Fase +50</button><button class="btn ghost" id="tGold">+1000 gold</button></div>
   <p class="tag">Protótipo · formas simples no lugar da arte</p>
 </div></div>
 <div class="modal" id="mCards" hidden><div class="box">
@@ -171,13 +171,17 @@ function sfx(k){if(muted||!AC)return;const t=AC.currentTime;
 // ---------- estado ----------
 let S, snap, run=null;
 // Escada de armas: cada evolução libera numa fase e aparece como carta garantida ao subir de nível.
+// Escada de armas (ph = fase que libera, na Loja e na carta de evolução).
 const WEAPONS=[
  {n:'Arco e flecha',dmg:1,rate:1,col:0xf3e2b0,size:1,speed:24},
- {n:'Besta',d:'Virotes pesados: 2,5x dano, tiro mais lento',dmg:2.5,rate:.6,ph:3,p:120,shop:150,col:0xb9895a,size:1.2,speed:28},
- {n:'Mosquete',d:'Bala de chumbo: 5x dano, atravessa 1 inimigo',dmg:5,rate:.45,ph:6,p:160,shop:300,col:0xdddddd,size:1.3,speed:40,pierce:1},
- {n:'Metralhadora',d:'Chuva de balas: 3x mais tiros',dmg:1.6,rate:3,ph:11,p:200,shop:500,col:0xffd060,size:.8,speed:45},
- {n:'Lança-foguetes',d:'Foguetes que explodem em área',dmg:6,rate:.5,ph:16,p:260,shop:800,col:0xff7a30,size:2.2,speed:18,boom:2.4},
- {n:'Canhão laser',d:'Raio que atravessa tudo na frente',dmg:4,rate:2.2,ph:21,p:320,shop:1200,col:0xff3355,size:1.8,speed:70,pierce:99},
+ {n:'Besta',d:'Virotes pesados: 2,5x dano, tiro mais lento',dmg:2.5,rate:.6,ph:5,p:120,shop:150,col:0xb9895a,size:1.2,speed:28},
+ {n:'Mosquete',d:'Bala de chumbo: 5x dano, atravessa 1 inimigo',dmg:5,rate:.45,ph:20,p:160,shop:500,col:0xdddddd,size:1.3,speed:40,pierce:1},
+ {n:'Metralhadora',d:'Chuva de balas: 3x mais tiros',dmg:1.6,rate:3,ph:50,p:200,shop:1500,col:0xffd060,size:.8,speed:45},
+ {n:'Lança-foguetes',d:'Foguetes que explodem em área',dmg:6,rate:.5,ph:75,p:260,shop:3000,col:0xff7a30,size:2.2,speed:18,boom:2.4},
+ {n:'Lança-chamas',d:'Jato de fogo curto e rápido: atravessa 2 e deixa todo mundo queimando',dmg:1.4,rate:7,ph:100,p:290,shop:5000,col:0xff5a1a,size:1.5,speed:16,pierce:2,burn:1},
+ {n:'Canhão Tesla',d:'Disparo elétrico que pula para 5 inimigos próximos',dmg:5,rate:1.6,ph:125,p:310,shop:8000,col:0x7fd8ff,size:1.4,speed:50,chain:5},
+ {n:'Mísseis teleguiados',d:'Mísseis que perseguem o inimigo e explodem',dmg:14,rate:1.5,ph:150,p:330,shop:12000,col:0xd8e0e8,size:1.8,speed:17,boom:2.2,home:1},
+ {n:'Canhão laser',d:'Raio que atravessa tudo na frente',dmg:7,rate:2.4,ph:200,p:360,shop:20000,col:0xff3355,size:1.8,speed:70,pierce:99},
 ];
 function fresh(){return {phase:1,gold:0,xp:0,lvl:1,weapon:0,baseWeapon:0,owned:[0],helper:false,helperOn:false,baby:false,babyOn:false,twin:false,twinOn:false,angel:0,attrs:{dmg:0,atk:0,mov:0,vida:0,xp:0},cards:{}};}
 const clone=o=>JSON.parse(JSON.stringify(o));
@@ -338,7 +342,9 @@ function startPhase(keep){
   ground.material.color.setHex(era().ground); lane.material.color.setHex(era().lane);
   syncUnits(); hud(); toast('Fase '+S.phase+': '+era().n);
 }
-function waveCount(w){return 6+2*w+Math.round(.8*(S.phase-1));}
+function waveCount(w){return 6+2*w+Math.min(30,Math.round(.8*(S.phase-1)));}
+// Vida dos inimigos pensada para 200+ fases: x7 na fase 20, x23 na 50, x65 na 100, x209 na 200 (fase 1 pela metade).
+function hpScale(){const q=S.phase-1;return (1+.25*q+.004*q*q)*(S.phase===1?.5:1);}
 function waveInterval(){return Math.max(.35,1.25-.03*S.phase-.05*run.wave);}
 function pickType(){const w=run.wave,p=S.phase,pool=['goblin','goblin'];
   if(w>=2||p>1)pool.push('lobo'); if(w>=3||p>1)pool.push('morcego'); if(w>=4||p>1)pool.push('golem'); return pool[Math.random()*pool.length|0];}
@@ -366,7 +372,7 @@ function enemyTex(V,type){const key=V.n+type;if(eTexCache[key])return eTexCache[
     x.lineWidth=4;x.beginPath();x.moveTo(52,ey+24);x.quadraticCurveTo(64,ey+17,76,ey+24);x.stroke();});}
 function tint(e,c){e.m.material.color.setHex(c);}
 function spawn(type,x,z){
-  const T=ETYPES[type],V=era()[type],sc=Math.pow(1.15,S.phase-1)*(S.phase===1?.5:1),m=mkSprite(enemyTex(V,type),1,1,T.fly?1.6:1);
+  const T=ETYPES[type],V=era()[type],sc=hpScale(),m=mkSprite(enemyTex(V,type),1,1,T.fly?1.6:1);
   const s=T.r*2*1.35; m.scale.set(s,s,1);
   m.position.set(x??(Math.random()*2-1)*HALF, T.fly?1.6:1, z??SPAWNZ); scene.add(m);
   const e={m,type,T,hp:T.hp*sc,max:T.hp*sc,sp:T.sp*Math.min(1.8,1+.03*(S.phase-1)),r:T.r,x0:m.position.x,ph:Math.random()*6,burn:0,burnD:0,slow:0,sumT:4};
@@ -382,7 +388,7 @@ function shoot(from,dmg,count,gold,half){
   for(let i=0;i<count;i++){const a=ang+(i-(count-1)/2)*.14;
     const m=new THREE.Mesh(arrowGeo,mat); {const g=st.big?1.8:1;m.scale.set(W.size*1.4*g,W.size*1.4*g,W.size*g);} m.position.set(from.x,1,from.z+.5); m.rotation.y=a; scene.add(m);
     if(i===0)sfx('shot');
-    run.ar.push({m,vx:Math.sin(a)*W.speed,vz:Math.cos(a)*W.speed,dmg,pierce:half?Math.floor(st.pierce/2):st.pierce,boom:W.boom||(st.expl?1.2:0),bounce:half?Math.floor(st.rico/2):st.rico,half:!!half,big:st.big,hit:new Set()});}
+    run.ar.push({m,vx:Math.sin(a)*W.speed,vz:Math.cos(a)*W.speed,dmg,pierce:half?Math.floor(st.pierce/2):st.pierce,boom:W.boom||(st.expl?1.2:0),bounce:half?Math.floor(st.rico/2):st.rico,half:!!half,big:st.big,home:!!W.home,hit:new Set()});}
 }
 function hurt(e,d){e.hp-=d; tint(e,0xff9090); e.flash=.08;}
 function kill(e){
@@ -406,7 +412,8 @@ function hitEnemy(e,ar){
   if(st.exec&&!e.T.boss&&e.hp>0&&e.hp<e.max*.15)e.hp=0;
   if(st.push)e.m.position.z=Math.min(SPAWNZ,e.m.position.z+(e.T.boss?.12:(ar.half?.3:.6)));
   // glitter do bebê: dano fixo, sem cartas nem atributos
-  if(st.fogo){e.burn=3;e.burnD=.5*st.dmg*st.fogo*(ar.half?.5:1);}
+  if(st.fogo||st.W.burn){e.burn=3;e.burnD=.5*st.dmg*Math.max(st.fogo,st.W.burn?1:0)*(ar.half?.5:1);}
+  if(st.W.chain){let n=0;const mx=ar.half?2:st.W.chain;for(const o of run.en){if(o===e||n>=mx)continue;if(o.m.position.distanceTo(e.m.position)<5){hurt(o,ar.dmg*.5);lightning(e.m.position,o.m.position);n++;}}}
   if(st.gelo){e.slow=2;e.slowF=ar.half?.8:.6;}
   if(st.raio){let n=0;const mx=ar.half?1:3;for(const o of run.en){if(o===e||n>=mx)continue;if(o.m.position.distanceTo(e.m.position)<4.5){hurt(o,ar.dmg*.6);lightning(e.m.position,o.m.position);n++;}}}
 }
@@ -588,7 +595,10 @@ function step(dt){
   shieldMesh.visible=run.shield;
   if(st.chuva){run.rainT-=dt;if(run.rainT<=0){run.rainT=15;flash(0xe8b14a);for(const e of [...run.en])hurt(e,st.dmg*2);toast('Chuva de flechas!');}}
   // flechas
-  for(const a of [...run.ar]){a.m.position.x+=a.vx*dt;a.m.position.z+=a.vz*dt;
+  for(const a of [...run.ar]){
+    if(a.home){const t=nearest(a.m.position.x,a.m.position.z);if(t){const sp=Math.hypot(a.vx,a.vz),dx=t.m.position.x-a.m.position.x,dz=t.m.position.z-a.m.position.z,d=Math.hypot(dx,dz)||1,k=Math.min(1,dt*5);
+      a.vx+=(dx/d*sp-a.vx)*k;a.vz+=(dz/d*sp-a.vz)*k;const n=Math.hypot(a.vx,a.vz)||1;a.vx*=sp/n;a.vz*=sp/n;a.m.rotation.y=Math.atan2(a.vx,a.vz);}}
+    a.m.position.x+=a.vx*dt;a.m.position.z+=a.vz*dt;
     // Ricochete: quica nas paredes laterais e no fundo, e pode acertar de novo
     if(a.bounce>0){const q=a.m.position;let b=false;
       if(Math.abs(q.x)>HALF+.6&&Math.sign(q.x)===Math.sign(a.vx)){a.vx=-a.vx;b=true;}
@@ -663,8 +673,8 @@ function showAttrs(){const L=$('attrList');L.innerHTML='';$('attrGold').textCont
   const WL=$('weapList');WL.innerHTML='';
   S.owned=S.owned||[0];
   if(WEAPONS.every((w,i)=>S.owned.includes(i)))WL.innerHTML='<p>Você já tem todas as armas.</p>';
-  // Armas da Loja: precisam de gold E de fase (uma nova a cada 5 fases: 5, 10, 15, 20, 25).
-  WEAPONS.forEach((w,i)=>{if(S.owned.includes(i))return;const need=5*i,lock=S.phase<need,own=false,eq=i===(S.baseWeapon||0),ok=!lock&&S.gold>=w.shop,b=document.createElement('button');b.className='card'+(ok||eq?'':' off');
+  // Armas da Loja: precisam de gold E de ter chegado na fase da arma (ph).
+  WEAPONS.forEach((w,i)=>{if(S.owned.includes(i))return;const need=w.ph||1,lock=S.phase<need,own=false,eq=i===(S.baseWeapon||0),ok=!lock&&S.gold>=w.shop,b=document.createElement('button');b.className='card'+(ok||eq?'':' off');
     b.innerHTML=`<span class="ic">${lock?'🔒':i}</span><span class="tx"><b>${w.n}</b><small>${lock?'Libera na fase '+need+' · '+w.shop+' gold':(w.d||'Arma inicial')}</small></span><span class="pr">${lock?'Fase '+need:w.shop+' gold'}</span>`;
     b.onclick=()=>{if(eq)return;if(lock){toast('Chegue na fase '+need+' para liberar');return;}
       if(!ok){toast('Gold insuficiente');return;}S.gold-=w.shop;S.owned.push(i);S.baseWeapon=i;S.weapon=i;toast('Nova arma: '+w.n);showAttrs();};WL.appendChild(b);});
@@ -721,6 +731,7 @@ $('btnArmsClose').onclick=()=>{$('mArms').hidden=true;showHub();};
 // Modo de teste: abra o jogo com #teste no fim do link.
 $('tPrev').onclick=()=>{S.phase=Math.max(1,S.phase-5);showHub();};
 $('tNext').onclick=()=>{S.phase+=5;showHub();};
+$('tNext50').onclick=()=>{S.phase+=50;showHub();};
 $('tGold').onclick=()=>{S.gold+=1000;showHub();};
 $('btnQuit').onclick=()=>{save();$('mQuit').hidden=false;try{window.close();}catch(_){}};
 $('btnQuitBack').onclick=()=>{$('mQuit').hidden=true;};
