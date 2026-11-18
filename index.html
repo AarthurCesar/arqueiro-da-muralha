@@ -175,7 +175,7 @@ const WEAPONS=[
  {n:'Lança-foguetes',d:'Foguetes que explodem em área',dmg:6,rate:.5,ph:16,p:260,shop:800,col:0xff7a30,size:2.2,speed:18,boom:2.4},
  {n:'Canhão laser',d:'Raio que atravessa tudo na frente',dmg:4,rate:2.2,ph:21,p:320,shop:1200,col:0xff3355,size:1.8,speed:70,pierce:99},
 ];
-function fresh(){return {phase:1,gold:0,xp:0,lvl:1,weapon:0,baseWeapon:0,owned:[0],helper:false,helperOn:false,baby:false,babyOn:false,attrs:{dmg:0,atk:0,mov:0,vida:0,xp:0},cards:{}};}
+function fresh(){return {phase:1,gold:0,xp:0,lvl:1,weapon:0,baseWeapon:0,owned:[0],helper:false,helperOn:false,baby:false,babyOn:false,twin:false,twinOn:false,attrs:{dmg:0,atk:0,mov:0,vida:0,xp:0},cards:{}};}
 const clone=o=>JSON.parse(JSON.stringify(o));
 // Permanente: fase, gold, atributos e arma comprada na Loja. Temporário (só dentro da fase): XP, nível, cartas e evoluções de arma.
 function resetPhaseStuff(){S.lvl=1;S.xp=0;S.cards={};S.weapon=S.baseWeapon||0;}
@@ -234,7 +234,7 @@ function startPhase(keep){
   snap=clone(S);
   const st=stats();
   run={t:0,wave:1,toSpawn:waveCount(1),spawnT:0,waveGap:0,boss:null,bossSpawned:false,en:[],ar:[],bo:[],fx:[],
-    hp:st.maxH,fireT:0,helpT:0,babyT:1,bonT:5,rainT:15,shieldT:0,shield:st.esc,triple:0,slowAll:0,pendingLv:pend,done:false};
+    hp:st.maxH,fireT:0,helpT:0,babyT:1,twinT:1.6,bonT:5,rainT:15,shieldT:0,shield:st.esc,triple:0,slowAll:0,pendingLv:pend,done:false};
   player.position.x=0; player.position.z=PZ; targetX=0; targetZ=PZ;
   ground.material.color.setHex(era().ground); lane.material.color.setHex(era().lane);
   syncUnits(); hud(); toast('Fase '+S.phase+': '+era().n);
@@ -297,23 +297,26 @@ function keepHalf(){const k=Math.floor((run&&run.earned||0)/2);S=clone(snap);S.g
 function phaseWon(){run.done=true; const g=Math.round(25*S.phase*stats().goldm); S.gold+=g;
   msg('Fase '+S.phase+' concluída!','Você ganhou '+g+' gold de recompensa. Nível, cartas e evoluções de arma ficam para trás; gold, atributos e armas da Loja continuam com você.',()=>{S.phase++;carry=true;showHub();});}
 // Bebê do Glitter: dano fixo (BABY), não usa atributos nem cartas.
+// Gêmeos do Glitter: o 1908 (forte) e o 0819 (mais fraco), comprados separadamente.
 const BABY={dmg:5,every:1.2,balls:3,boom:1.6,speed:14};
-let baby=null;
+const TWIN={dmg:2,every:1.4,balls:2,boom:1.2,speed:14};
+let baby=null,twin=null;
 const glitterMats=[0xff7ad9,0xffd84a,0x9be7ff,0xc58bff].map(c=>new THREE.MeshBasicMaterial({color:c}));
 const glitterGeo=new THREE.OctahedronGeometry(.22);
-function mkBaby(){const g=new THREE.Group();
+function mkBaby(hatCol){const g=new THREE.Group();
   const body=new THREE.Mesh(new THREE.SphereGeometry(.42,12,10),new THREE.MeshLambertMaterial({color:0xffb6d9}));body.position.y=.45;g.add(body);
   const h=new THREE.Mesh(new THREE.SphereGeometry(.36,12,10),new THREE.MeshLambertMaterial({color:0xf6d2b4}));h.position.y=1.05;g.add(h);
-  const hat=new THREE.Mesh(new THREE.ConeGeometry(.2,.4,8),new THREE.MeshLambertMaterial({color:0xffd84a,emissive:0x664400}));hat.position.y=1.5;g.add(hat);
+  const hat=new THREE.Mesh(new THREE.ConeGeometry(.2,.4,8),new THREE.MeshLambertMaterial({color:hatCol||0xffd84a,emissive:0x443300}));hat.position.y=1.5;g.add(hat);
   scene.add(g);return g;}
-function throwGlitter(from){const tgt=nearest(from.x,from.z);let ang=0;
+function throwGlitter(from,B){B=B||BABY;const tgt=nearest(from.x,from.z);let ang=0;
   if(tgt)ang=Math.atan2(tgt.m.position.x-from.x,tgt.m.position.z-from.z);
-  for(let i=0;i<BABY.balls;i++){const a=ang+(i-1)*.18,m=new THREE.Mesh(glitterGeo,glitterMats[(Math.random()*4)|0]);
+  for(let i=0;i<B.balls;i++){const a=ang+(i-(B.balls-1)/2)*.18,m=new THREE.Mesh(glitterGeo,glitterMats[(Math.random()*4)|0]);
     m.position.set(from.x,1,from.z+.4);scene.add(m);
-    run.ar.push({m,vx:Math.sin(a)*BABY.speed,vz:Math.cos(a)*BABY.speed,dmg:BABY.dmg,pierce:0,boom:BABY.boom,fixed:true,hit:new Set()});}
+    run.ar.push({m,vx:Math.sin(a)*B.speed,vz:Math.cos(a)*B.speed,dmg:B.dmg,pierce:0,boom:B.boom,fixed:true,hit:new Set()});}
   sfx('bonus');}
 function syncUnits(){const st=stats();
-  const wantBaby=!!(S.baby&&S.babyOn); if(wantBaby&&!baby)baby=mkBaby(); if(!wantBaby&&baby){scene.remove(baby);baby=null;}
+  const wantBaby=!!(S.baby&&S.babyOn); if(wantBaby&&!baby)baby=mkBaby(0xffd84a); if(!wantBaby&&baby){scene.remove(baby);baby=null;}
+  const wantTwin=!!(S.twin&&S.twinOn); if(wantTwin&&!twin)twin=mkBaby(0x9be7ff); if(!wantTwin&&twin){scene.remove(twin);twin=null;}
   if(st.ajud&&!helper){helper=mkArcher(0x4fa07a);} if(!st.ajud&&helper){scene.remove(helper);helper=null;}
   if(st.cav&&!knight){knight=new THREE.Group();const b=new THREE.Mesh(new THREE.BoxGeometry(1.1,1.4,.6),new THREE.MeshLambertMaterial({color:0xb8c0c8}));b.position.y=.7;knight.add(b);
     const s=new THREE.Mesh(new THREE.BoxGeometry(1.5,1,.15),new THREE.MeshLambertMaterial({color:0x8a3a2a}));s.position.set(0,.8,.4);knight.add(s);scene.add(knight);}
@@ -340,6 +343,7 @@ function step(dt){
    if(dl>1e-4){player.position.x+=dx/dl*mv;player.position.z+=dz/dl*mv;}}
   const PPZ=player.position.z;
   if(baby){baby.position.set(Math.max(-HALF,Math.min(HALF,player.position.x+(player.position.x<-2?1.3:-1.3))),0,PPZ+.2);baby.children.forEach(c=>c.rotation.y+=dt*4);}
+  if(twin){twin.position.set(Math.max(-HALF,Math.min(HALF,player.position.x+(player.position.x<-2?1.1:-1.1))),0,PPZ-.9);twin.children.forEach(c=>c.rotation.y-=dt*4);}
   if(helper)helper.position.set(Math.max(-HALF,Math.min(HALF,player.position.x+(player.position.x>2?-1.3:1.3))),0,PPZ+.2);
   if(knight)knight.position.set(player.position.x,0,PPZ+4.2);
   // ondas
@@ -353,7 +357,8 @@ function step(dt){
   // tiros
   if(run.en.length){run.fireT-=dt;if(run.fireT<=0){run.fireT=1/st.rate;shoot(player.position,st.dmg,st.shots+(run.triple>0?2:0),run.triple>0);}
     if(helper){run.helpT-=dt;if(run.helpT<=0){run.helpT=1/st.rate;shoot(helper.position,st.dmg*.5,Math.max(1,Math.floor((st.shots+(run.triple>0?2:0))/2)),run.triple>0,true);}}
-    if(baby){run.babyT-=dt;if(run.babyT<=0){run.babyT=BABY.every;throwGlitter(baby.position);}}}
+    if(baby){run.babyT-=dt;if(run.babyT<=0){run.babyT=BABY.every;throwGlitter(baby.position,BABY);}}
+    if(twin){run.twinT-=dt;if(run.twinT<=0){run.twinT=TWIN.every;throwGlitter(twin.position,TWIN);}}}
   run.triple=Math.max(0,run.triple-dt); run.slowAll=Math.max(0,run.slowAll-dt);
   if(st.esc&&!run.shield){run.shieldT-=dt;if(run.shieldT<=0)run.shield=true;}
   shieldMesh.visible=run.shield;
@@ -439,8 +444,11 @@ function showAttrs(){const L=$('attrList');L.innerHTML='';$('attrGold').textCont
     b.onclick=()=>{if(eq)return;if(own){S.baseWeapon=i;S.weapon=i;toast('Equipada: '+w.n);showAttrs();return;}
       if(!ok){toast('Gold insuficiente');return;}S.gold-=w.shop;S.owned.push(i);S.baseWeapon=i;S.weapon=i;toast('Nova arma: '+w.n);showAttrs();};WL.appendChild(b);});
   if(!S.baby){const ok=S.gold>=1908,b=document.createElement('button');b.className='card'+(ok?'':' off');
-    b.innerHTML=`<span class="ic">✦</span><span class="tx"><span class="tag">Personagem</span><b>Bebê do Glitter</b><small>Joga glitter que explode em área. Dano fixo: não usa seus atributos nem cartas</small></span><span class="pr">1908 gold</span>`;
-    b.onclick=()=>{if(!ok){toast('Gold insuficiente');return;}S.gold-=1908;S.baby=true;S.babyOn=true;toast('Bebê do Glitter chegou!');showAttrs();};WL.appendChild(b);}
+    b.innerHTML=`<span class="ic">✦</span><span class="tx"><span class="tag">Personagem</span><b>Gêmeo 1908</b><small>O gêmeo forte: 3 bolinhas de glitter, 5 de dano cada, em área. Dano fixo, não usa seus atributos nem cartas</small></span><span class="pr">1908 gold</span>`;
+    b.onclick=()=>{if(!ok){toast('Gold insuficiente');return;}S.gold-=1908;S.baby=true;S.babyOn=true;toast('Gêmeo 1908 chegou!');showAttrs();};WL.appendChild(b);}
+  if(!S.twin){const ok=S.gold>=819,b=document.createElement('button');b.className='card'+(ok?'':' off');
+    b.innerHTML=`<span class="ic">✧</span><span class="tx"><span class="tag">Personagem</span><b>Gêmeo 0819</b><small>O gêmeo menor: 2 bolinhas de glitter, 2 de dano cada, em área. Dano fixo</small></span><span class="pr">0819 gold</span>`;
+    b.onclick=()=>{if(!ok){toast('Gold insuficiente');return;}S.gold-=819;S.twin=true;S.twinOn=true;toast('Gêmeo 0819 chegou!');showAttrs();};WL.appendChild(b);}
   if(!S.helper){const ok=S.gold>=650,b=document.createElement('button');b.className='card'+(ok?'':' off');
     b.innerHTML=`<span class="ic">A</span><span class="tx"><span class="tag">Personagem</span><b>Ajudante arqueiro</b><small>Igual ao seu arqueiro, mas tudo pela metade: dano, tiros, efeitos</small></span><span class="pr">650 gold</span>`;
     b.onclick=()=>{if(!ok){toast('Gold insuficiente');return;}S.gold-=650;S.helper=true;S.helperOn=true;toast('Ajudante contratado!');showAttrs();};WL.appendChild(b);}
@@ -471,8 +479,11 @@ function showArms(){const L=$('armsList');L.innerHTML='';S.owned=S.owned||[0];
     b.innerHTML=`<span class="ic">${i}</span><span class="tx"><b>${w.n}</b><small>${w.d||'Arma inicial'}</small></span><span class="pr">${eq?'Equipada':'Equipar'}</span>`;
     b.onclick=()=>{S.baseWeapon=i;S.weapon=i;showArms();};L.appendChild(b);});
   if(S.baby){const b=document.createElement('button');b.className='card';
-    b.innerHTML=`<span class="ic">✦</span><span class="tx"><span class="tag">Personagem</span><b>Bebê do Glitter</b><small>Glitter em área com dano fixo</small></span><span class="pr">${S.babyOn?'Levando':'Levar'}</span>`;
+    b.innerHTML=`<span class="ic">✦</span><span class="tx"><span class="tag">Personagem</span><b>Gêmeo 1908</b><small>Glitter forte em área, dano fixo</small></span><span class="pr">${S.babyOn?'Levando':'Levar'}</span>`;
     b.onclick=()=>{S.babyOn=!S.babyOn;showArms();};L.appendChild(b);}
+  if(S.twin){const b=document.createElement('button');b.className='card';
+    b.innerHTML=`<span class="ic">✧</span><span class="tx"><span class="tag">Personagem</span><b>Gêmeo 0819</b><small>Glitter menor em área, dano fixo</small></span><span class="pr">${S.twinOn?'Levando':'Levar'}</span>`;
+    b.onclick=()=>{S.twinOn=!S.twinOn;showArms();};L.appendChild(b);}
   if(S.helper){const b=document.createElement('button');b.className='card';
     b.innerHTML=`<span class="ic">A</span><span class="tx"><span class="tag">Personagem</span><b>Ajudante arqueiro</b><small>Copia sua arma e cartas pela metade</small></span><span class="pr">${S.helperOn?'Levando':'Levar'}</span>`;
     b.onclick=()=>{S.helperOn=!S.helperOn;showArms();};L.appendChild(b);}
