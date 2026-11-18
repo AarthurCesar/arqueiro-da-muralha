@@ -120,7 +120,7 @@ const PZ=2, SPAWNZ=31, HALF=4.6;
 const CARDS=[
  {id:'dupla',n:'Flecha dupla',t:'Arma',d:'+1 flecha por tiro',p:60,ic:'II'},
  {id:'perf',n:'Flecha perfurante',t:'Arma',d:'Atravessa +2 inimigos',p:70,ic:'→'},
- {id:'fogo',n:'Flecha de fogo',t:'Arma',d:'Queima por 3 s',p:80,ic:'F'},
+ {id:'fogo',n:'Flecha de fogo',t:'Arma',d:'Queima: 50% do dano por segundo, por 3 s',p:80,ic:'F'},
  {id:'gelo',n:'Flecha de gelo',t:'Arma',d:'Inimigo 40% mais lento',p:80,ic:'G',u:1},
  {id:'raio',n:'Cajado de raio',t:'Arma nova',d:'Raio pula entre 3 inimigos',p:150,ic:'R',u:1},
  {id:'ima',n:'Ímã',t:'Passiva',d:'Puxa bônus de longe',p:50,ic:'Í',u:1},
@@ -321,7 +321,7 @@ function syncUnits(){const st=stats();
 // ---------- controle ----------
 const ZMAX=PZ+10; let targetX=0,targetZ=PZ,drag=null; const keys={};
 addEventListener('pointerdown',e=>{if(e.target.closest('.modal,button'))return;drag={x:e.clientX,y:e.clientY,px:player.position.x,pz:player.position.z};});
-addEventListener('pointermove',e=>{if(!drag)return;const w=Math.min(innerWidth,600);targetX=Math.max(-HALF,Math.min(HALF,drag.px-(e.clientX-drag.x)/w*13));targetZ=Math.max(PZ,Math.min(ZMAX,drag.pz-(e.clientY-drag.y)/w*13));});
+addEventListener('pointermove',e=>{if(!drag||paused())return;const w=Math.min(innerWidth,600);targetX=Math.max(-HALF,Math.min(HALF,drag.px-(e.clientX-drag.x)/w*13));targetZ=Math.max(PZ,Math.min(ZMAX,drag.pz-(e.clientY-drag.y)/w*13));});
 addEventListener('pointerup',()=>drag=null); addEventListener('pointercancel',()=>drag=null);
 addEventListener('keydown',e=>keys[e.key.length==1?e.key.toLowerCase():e.key]=1); addEventListener('keyup',e=>keys[e.key.length==1?e.key.toLowerCase():e.key]=0);
 
@@ -368,9 +368,10 @@ function step(dt){
         if(a.pierce--<=0){scene.remove(a.m);run.ar.splice(run.ar.indexOf(a),1);break;}}}}
   // inimigos
   for(const e of [...run.en]){
-    if(e.burn>0){e.burn-=dt;e.hp-=e.burnD*dt;}
+    if(e.burn>0){const t=Math.min(dt,e.burn);e.burn-=dt;e.hp-=e.burnD*t;
+      if(!(e.flash>0))e.m.material.emissive.setHex(e.burn>0?0x7a2a00:0);}
     if(e.slow>0)e.slow-=dt;
-    if(e.flash>0){e.flash-=dt;if(e.flash<=0)e.m.material.emissive.setHex(0);}
+    if(e.flash>0){e.flash-=dt;if(e.flash<=0)e.m.material.emissive.setHex(e.burn>0?0x7a2a00:0);}
     if(e.hp<=0){kill(e);if(run.done)return;continue;}
     let sp=e.sp*(e.slow>0?(e.slowF||.6):1)*(run.slowAll>0?.5:1);
     const p=e.m.position;
@@ -393,6 +394,8 @@ function step(dt){
   for(const f of [...run.fx]){f.life-=dt;if(f.life<=0){scene.remove(f.m);run.fx.splice(run.fx.indexOf(f),1);}}
 }
 function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;
+  // Com qualquer janela aberta (cartas, pausa...), solta o arrasto e mantém o arqueiro onde está
+  if(paused()){drag=null;targetX=player.position.x;targetZ=player.position.z;for(const k in keys)keys[k]=0;}
   if(run&&!run.done&&!paused())step(dt);
   if(run)hud(); $('hud').style.visibility=(run&&$('mStart').hidden)?'visible':'hidden'; renderer.render(scene,cam); requestAnimationFrame(frame);}
 
