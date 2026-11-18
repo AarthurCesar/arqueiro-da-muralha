@@ -127,7 +127,7 @@ const CARDS=[
  {id:'sorte',n:'Sorte',t:'Passiva',d:'+25% de gold',p:70,ic:'$'},
  {id:'esc',n:'Escudo',t:'Passiva',d:'Bloqueia 1 toque a cada 30 s',p:90,ic:'E',u:1},
  {id:'chuva',n:'Chuva de flechas',t:'Especial',d:'A cada 15 s, dano na tela toda',p:130,ic:'≡',u:1},
- {id:'rico',n:'Ricochete',t:'Arma',d:'O tiro quica em mais 2 inimigos',p:90,ic:'↯'},
+ {id:'rico',n:'Ricochete',t:'Arma',d:'O tiro quica nas paredes até 3 vezes',p:90,ic:'↯'},
  {id:'crit',n:'Golpe crítico',t:'Arma',d:'20% de chance de 3x dano',p:80,ic:'!'},
  {id:'expl',n:'Flecha explosiva',t:'Arma',d:'Cada tiro explode numa área pequena',p:110,ic:'*'},
  {id:'vamp',n:'Vampiro',t:'Passiva',d:'A cada 25 inimigos derrotados, recupera 1 coração',p:100,ic:'V'},
@@ -184,7 +184,7 @@ function stats(){
   const a=S.attrs,c=S.cards,W=WEAPONS[S.weapon||0];
   return {W, dmg:(1+.1*a.dmg)*W.dmg, rate:1.6*(1+.08*a.atk)*W.rate, mov:9*(1+.06*a.mov),
     maxH:3+a.vida, xpm:1+.1*a.xp, shots:1+(c.dupla||0), pierce:2*(c.perf||0)+(W.pierce||0), fogo:c.fogo||0,
-    gelo:!!c.gelo, raio:!!c.raio, ajud:!!(S.helper&&S.helperOn), cav:!!c.cav, ima:!!c.ima, goldm:1+.25*(c.sorte||0), esc:!!c.esc, chuva:!!c.chuva, rico:c.rico?2:0, crit:!!c.crit, expl:!!c.expl, vamp:!!c.vamp};
+    gelo:!!c.gelo, raio:!!c.raio, ajud:!!(S.helper&&S.helperOn), cav:!!c.cav, ima:!!c.ima, goldm:1+.25*(c.sorte||0), esc:!!c.esc, chuva:!!c.chuva, rico:c.rico?3:0, crit:!!c.crit, expl:!!c.expl, vamp:!!c.vamp};
 }
 const xpNeed=l=>Math.round(10*Math.pow(1.2,l-1));
 const attrCost=n=>5*(n+1);
@@ -357,14 +357,15 @@ function step(dt){
   if(st.chuva){run.rainT-=dt;if(run.rainT<=0){run.rainT=15;flash(0xe8b14a);for(const e of [...run.en])hurt(e,st.dmg*2);toast('Chuva de flechas!');}}
   // flechas
   for(const a of [...run.ar]){a.m.position.x+=a.vx*dt;a.m.position.z+=a.vz*dt;
+    // Ricochete: quica nas paredes laterais e no fundo, e pode acertar de novo
+    if(a.bounce>0){const q=a.m.position;let b=false;
+      if(Math.abs(q.x)>HALF+.6&&Math.sign(q.x)===Math.sign(a.vx)){a.vx=-a.vx;b=true;}
+      else if(q.z>SPAWNZ+1&&a.vz>0){a.vz=-a.vz;b=true;}
+      if(b){a.bounce--;a.hit.clear();a.m.rotation.y=Math.atan2(a.vx,a.vz);}}
     if(a.m.position.z>SPAWNZ+3||a.m.position.z<-2||Math.abs(a.m.position.x)>HALF+3){scene.remove(a.m);run.ar.splice(run.ar.indexOf(a),1);continue;}
     for(const e of run.en){if(a.hit.has(e))continue;const p=e.m.position;
       if((p.x-a.m.position.x)**2+(p.z-a.m.position.z)**2<(e.r+.3)**2){a.hit.add(e);hitEnemy(e,a);
-        if(a.pierce--<=0){
-          if(a.bounce>0){let n=null,bd=64;for(const o of run.en){if(a.hit.has(o))continue;const q=(o.m.position.x-p.x)**2+(o.m.position.z-p.z)**2;if(q<bd){bd=q;n=o;}}
-            if(n){a.bounce--;a.pierce=0;const dx=n.m.position.x-a.m.position.x,dz=n.m.position.z-a.m.position.z,l=Math.hypot(dx,dz)||1,s=Math.hypot(a.vx,a.vz);
-              a.vx=dx/l*s;a.vz=dz/l*s;a.m.rotation.y=Math.atan2(dx,dz);break;}}
-          scene.remove(a.m);run.ar.splice(run.ar.indexOf(a),1);break;}}}}
+        if(a.pierce--<=0){scene.remove(a.m);run.ar.splice(run.ar.indexOf(a),1);break;}}}}
   // inimigos
   for(const e of [...run.en]){
     if(e.burn>0){e.burn-=dt;e.hp-=e.burnD*dt;}
