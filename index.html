@@ -125,6 +125,14 @@ const CARDS=[
  {id:'rico',n:'Ricochete',t:'Arma',d:'O tiro quica nas paredes até 3 vezes',p:90,ic:'↯'},
  {id:'crit',n:'Golpe crítico',t:'Arma',d:'20% de chance de 3x dano',p:80,ic:'!'},
  {id:'expl',n:'Flecha explosiva',t:'Arma',d:'Cada tiro explode numa área pequena',p:110,ic:'*'},
+ {id:'afiada',n:'Ponta afiada',t:'Arma',d:'+30% de dano',p:80,ic:'▲'},
+ {id:'rapido',n:'Mão rápida',t:'Arma',d:'+30% de velocidade de tiro',p:80,ic:'»'},
+ {id:'gigante',n:'Flecha gigante',t:'Arma',d:'Flechas bem maiores, mais fáceis de acertar',p:70,ic:'⬆'},
+ {id:'exec',n:'Execução',t:'Arma',d:'Inimigo (não chefe) com menos de 15% de vida morre na hora',p:100,ic:'✕'},
+ {id:'empurra',n:'Flecha de impacto',t:'Arma',d:'Cada acerto empurra o inimigo para trás',p:70,ic:'⇈'},
+ {id:'botas',n:'Botas leves',t:'Passiva',d:'+40% de velocidade de movimento',p:50,ic:'B'},
+ {id:'estudo',n:'Aprendiz',t:'Passiva',d:'+30% de XP',p:60,ic:'✎'},
+ {id:'bonus',n:'Caçador de bônus',t:'Passiva',d:'Bônus aparecem 2x mais vezes',p:60,ic:'◆'},
  {id:'anjo',n:'Anjo da Guarda',t:'Passiva',d:'Se você for derrotado nesta fase, revive uma vez com 3 corações',p:120,ic:'✝'},
 ];
 const ATTRS=[
@@ -176,8 +184,8 @@ const clone=o=>JSON.parse(JSON.stringify(o));
 function resetPhaseStuff(){S.lvl=1;S.xp=0;S.cards={};S.weapon=S.baseWeapon||0;}
 function stats(){
   const a=S.attrs,c=S.cards,W=WEAPONS[S.weapon||0];
-  return {W, dmg:(1+.1*a.dmg)*W.dmg, rate:1.6*(1+.08*a.atk)*W.rate, mov:9*(1+.06*a.mov),
-    maxH:3, xpm:1+.1*a.xp, shots:1+(c.dupla||0), pierce:2*(c.perf||0)+(W.pierce||0), fogo:c.fogo||0,
+  return {W, dmg:(1+.1*a.dmg)*W.dmg*(c.afiada?1.3:1), rate:1.6*(1+.08*a.atk)*W.rate*(c.rapido?1.3:1), mov:9*(1+.06*a.mov)*(c.botas?1.4:1),
+    maxH:3, xpm:(1+.1*a.xp)*(c.estudo?1.3:1), big:!!c.gigante, exec:!!c.exec, push:!!c.empurra, bonus:!!c.bonus, shots:1+(c.dupla||0), pierce:2*(c.perf||0)+(W.pierce||0), fogo:c.fogo||0,
     gelo:!!c.gelo, raio:!!c.raio, ajud:!!(S.helper&&S.helperOn), cav:!!c.cav, ima:!!c.ima, goldm:1+.25*(c.sorte||0), esc:!!c.esc, chuva:!!c.chuva, rico:c.rico?3:0, crit:!!c.crit, expl:!!c.expl, vamp:!!c.vamp};
 }
 const xpNeed=l=>Math.round(10*Math.pow(1.2,l-1));
@@ -253,9 +261,9 @@ function shoot(from,dmg,count,gold,half){
   const tgt=nearest(from.x,from.z); let ang=0;
   if(tgt){ang=Math.atan2(tgt.m.position.x-from.x,tgt.m.position.z-from.z);}
   for(let i=0;i<count;i++){const a=ang+(i-(count-1)/2)*.14;
-    const m=new THREE.Mesh(arrowGeo,mat); m.scale.set(W.size*1.4,W.size*1.4,W.size); m.position.set(from.x,1,from.z+.5); m.rotation.y=a; scene.add(m);
+    const m=new THREE.Mesh(arrowGeo,mat); {const g=st.big?1.8:1;m.scale.set(W.size*1.4*g,W.size*1.4*g,W.size*g);} m.position.set(from.x,1,from.z+.5); m.rotation.y=a; scene.add(m);
     if(i===0)sfx('shot');
-    run.ar.push({m,vx:Math.sin(a)*W.speed,vz:Math.cos(a)*W.speed,dmg,pierce:half?Math.floor(st.pierce/2):st.pierce,boom:W.boom||(st.expl?1.2:0),bounce:half?Math.floor(st.rico/2):st.rico,half:!!half,hit:new Set()});}
+    run.ar.push({m,vx:Math.sin(a)*W.speed,vz:Math.cos(a)*W.speed,dmg,pierce:half?Math.floor(st.pierce/2):st.pierce,boom:W.boom||(st.expl?1.2:0),bounce:half?Math.floor(st.rico/2):st.rico,half:!!half,big:st.big,hit:new Set()});}
 }
 function hurt(e,d){e.hp-=d; e.m.material.emissive&&e.m.material.emissive.setHex(0x553322); e.flash=.08;}
 function kill(e){
@@ -275,7 +283,10 @@ function hitEnemy(e,ar){
   if(ar.boom){for(const o of run.en){if(o!==e&&o.m.position.distanceTo(e.m.position)<ar.boom)hurt(o,ar.dmg*.6);}
     const b=new THREE.Mesh(new THREE.SphereGeometry(ar.boom,14,10),new THREE.MeshBasicMaterial({color:ar.fixed?0xff7ad9:0xff9a40,transparent:true,opacity:.45}));
     b.position.copy(e.m.position);scene.add(b);run.fx.push({m:b,life:.18});}
-  if(ar.fixed)return; // glitter do bebê: dano fixo, sem cartas nem atributos
+  if(ar.fixed)return;
+  if(st.exec&&!e.T.boss&&e.hp>0&&e.hp<e.max*.15)e.hp=0;
+  if(st.push)e.m.position.z=Math.min(SPAWNZ,e.m.position.z+(e.T.boss?.12:(ar.half?.3:.6)));
+  // glitter do bebê: dano fixo, sem cartas nem atributos
   if(st.fogo){e.burn=3;e.burnD=.5*st.dmg*st.fogo*(ar.half?.5:1);}
   if(st.gelo){e.slow=2;e.slowF=ar.half?.8:.6;}
   if(st.raio){let n=0;const mx=ar.half?1:3;for(const o of run.en){if(o===e||n>=mx)continue;if(o.m.position.distanceTo(e.m.position)<4.5){hurt(o,ar.dmg*.6);lightning(e.m.position,o.m.position);n++;}}}
@@ -377,7 +388,7 @@ function step(dt){
       if(b){a.bounce--;a.hit.clear();a.m.rotation.y=Math.atan2(a.vx,a.vz);}}
     if(a.m.position.z>SPAWNZ+3||a.m.position.z<-2||Math.abs(a.m.position.x)>HALF+3){scene.remove(a.m);run.ar.splice(run.ar.indexOf(a),1);continue;}
     for(const e of run.en){if(a.hit.has(e))continue;const p=e.m.position;
-      if((p.x-a.m.position.x)**2+(p.z-a.m.position.z)**2<(e.r+.3)**2){a.hit.add(e);hitEnemy(e,a);
+      if((p.x-a.m.position.x)**2+(p.z-a.m.position.z)**2<(e.r+(a.big?.75:.3))**2){a.hit.add(e);hitEnemy(e,a);
         if(a.pierce--<=0){scene.remove(a.m);run.ar.splice(run.ar.indexOf(a),1);break;}}}}
   // inimigos
   for(const e of [...run.en]){
@@ -396,7 +407,7 @@ function step(dt){
       if(e.T.boss){run.boss=null;run.bossHp=e.hp;run.hp=1;run.shield=false;} loseHeart(); if(run.done)return;}
   }
   // bônus
-  run.bonT-=dt; if(run.bonT<=0){run.bonT=6+Math.random()*4;const k=Object.keys(BON)[Math.random()*4|0];
+  run.bonT-=dt; if(run.bonT<=0){run.bonT=(6+Math.random()*4)/(st.bonus?2:1);const k=Object.keys(BON)[Math.random()*4|0];
     const m=new THREE.Mesh(new THREE.OctahedronGeometry(.45),new THREE.MeshLambertMaterial({color:BON[k].col,emissive:BON[k].col,emissiveIntensity:.35}));
     m.position.set((Math.random()*2-1)*HALF,.9,SPAWNZ);scene.add(m);run.bo.push({m,k});}
   for(const b of [...run.bo]){const p=b.m.position;p.z-=3*dt;b.m.rotation.y+=3*dt;
