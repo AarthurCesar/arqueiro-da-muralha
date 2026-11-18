@@ -441,22 +441,26 @@ const glitterGeo=new THREE.OctahedronGeometry(.22);
 // Gêmeos do Glitter: casal. Gêmeo 0819 = menino (azul), Gêmeo 1908 = menina (rosa, maria-chiquinha com laços).
 function drawBaby(x,girl,hatCol){const O='#1c120c';x.lineJoin='round';x.lineCap='round';x.strokeStyle=O;
   const F=(c,w)=>{x.fillStyle=c;x.fill();x.lineWidth=w||5;x.stroke();},E=(cx,cy,rx,ry)=>{x.beginPath();x.ellipse(cx,cy,rx,ry,0,0,7);};
-  const suit=girl?'#ff9cc8':'#8cc8ff',hair=girl?'#f0a24a':'#7a4a2a';
+  const suit=girl?'#8a2638':'#8cc8ff',hair=girl?'#2a1a14':'#7a4a2a';
   x.fillStyle='rgba(0,0,0,.25)';E(64,120,30,6);x.fill();
   for(const s of [-1,1]){E(64+s*15,112,10,7);F(suit,4);}
   if(girl){x.beginPath();x.moveTo(40,80);x.lineTo(88,80);x.lineTo(98,112);x.quadraticCurveTo(64,120,30,112);x.closePath();F(suit);
     x.beginPath();x.moveTo(34,104);x.quadraticCurveTo(64,112,94,104);x.lineWidth=3;x.strokeStyle='#fff';x.stroke();x.strokeStyle=O;}
   else{E(64,96,30,22);F(suit);E(64,100,7,7);F('#ffe27a',3);}
   for(const s of [-1,1]){E(64+s*30,90,8,8);F('#f6d2b4',4);}
-  E(64,58,30,28);F('#f6d2b4');
-  if(girl){for(const s of [-1,1]){E(64+s*32,52,9,13);F(hair,4);x.beginPath();x.moveTo(64+s*26,40);x.lineTo(64+s*40,32);x.lineTo(64+s*40,46);x.closePath();F('#e23a7a',3);}
-    x.beginPath();x.moveTo(36,52);x.quadraticCurveTo(44,28,64,30);x.quadraticCurveTo(84,28,92,52);x.quadraticCurveTo(76,40,64,44);x.quadraticCurveTo(52,40,36,52);x.closePath();F(hair,4);}
+  if(girl){x.beginPath();x.moveTo(32,56);x.quadraticCurveTo(26,84,36,96);x.lineTo(92,96);x.quadraticCurveTo(102,84,96,56);x.quadraticCurveTo(64,20,30,56);x.closePath();F(hair,4);}
+  E(64,58,30,28);F('#f2c9a8');
+  if(girl){x.beginPath();x.moveTo(34,60);x.quadraticCurveTo(36,30,64,30);x.quadraticCurveTo(92,30,94,60);x.quadraticCurveTo(84,40,58,42);x.quadraticCurveTo(44,46,34,60);x.closePath();F(hair,4);
+    for(const s of [-1,1]){E(64+s*29,66,4,5);F('#3fc4c4',2.5);}
+    x.beginPath();x.moveTo(52,86);x.quadraticCurveTo(64,96,76,86);x.lineWidth=1.5;x.strokeStyle='#c8ccd4';x.stroke();x.strokeStyle=O;E(64,93,3,3.5);F('#c8ccd4',1.5);}
   else{x.beginPath();x.moveTo(52,34);x.quadraticCurveTo(60,22,70,30);x.quadraticCurveTo(64,30,62,36);x.lineWidth=5;x.strokeStyle=O;x.stroke();x.lineWidth=3;x.strokeStyle=hair;x.stroke();x.strokeStyle=O;}
   x.beginPath();x.fillStyle=hatCol;x.moveTo(girl?52:44,34);x.lineTo(girl?66:60,2);x.lineTo(girl?82:78,32);x.closePath();F(hatCol,4);
   E(girl?66:60,4,6,6);F('#fff',3);
   x.fillStyle=O;for(const s of [-1,1]){E(64+s*11,60,4.5,5.5);x.fill();}
+  if(girl){x.fillStyle='#fff';for(const s of [-1,1]){E(64+s*11-1.5,58,1.5,1.8);x.fill();}
+    for(const s of [-1,1]){x.beginPath();x.moveTo(64+s*5,51);x.quadraticCurveTo(64+s*11,46.5,64+s*17,49.5);x.lineWidth=3;x.stroke();}}
   x.fillStyle='rgba(255,120,150,.5)';for(const s of [-1,1]){E(64+s*20,70,6,4);x.fill();}
-  x.beginPath();x.arc(64,68,7,.2,Math.PI-.2);x.lineWidth=3;x.stroke();}
+  if(girl){x.beginPath();x.moveTo(57,68);x.quadraticCurveTo(64,76,71,68);x.quadraticCurveTo(64,69.5,57,68);x.closePath();x.fillStyle='#f07a95';x.fill();x.beginPath();x.moveTo(57,68);x.quadraticCurveTo(64,72,71,68);x.lineWidth=1.5;x.strokeStyle='#8a2638';x.stroke();x.strokeStyle=O;}else{x.beginPath();x.arc(64,68,7,.2,Math.PI-.2);x.lineWidth=3;x.stroke();}}
 function mkBaby(hatCol,girl){const g=new THREE.Group();
   const tex=canvasTex(256,256,(x)=>{x.scale(2,2);drawBaby(x,girl,hex(hatCol||0xffd84a));});
   const spr=mkSprite(tex,1.6,1.6,1.1);g.add(spr);g.userData={spr,ph:Math.random()*6};scene.add(g);return g;}
