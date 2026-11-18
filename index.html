@@ -446,7 +446,7 @@ function drawGirl(x,hatCol){const O='#1c120c';x.lineJoin='round';x.lineCap='roun
   x.fillStyle='rgba(0,0,0,.25)';E(64,120,30,6);x.fill();
   for(const s of [-1,1]){E(64+s*12,113,8,6);F(wine,4);}
   // cachos atrás
-  for(const [cx,cy,r] of [[36,52,13],[92,52,13],[32,70,12],[96,70,12],[36,86,11],[92,86,11]]){E(cx,cy,r,r);F(hair,4);}
+  for(const [cx,cy,r] of [[38,46,10],[90,46,10],[35,58,8],[93,58,8]]){E(cx,cy,r,r);F(hair,4);}
   // vestido com mangas bufantes
   x.beginPath();x.moveTo(46,84);x.lineTo(82,84);x.lineTo(94,112);x.quadraticCurveTo(64,118,34,112);x.closePath();F(wine);
   for(const s of [-1,1]){E(64+s*22,88,10,8);F(wine,4);}
