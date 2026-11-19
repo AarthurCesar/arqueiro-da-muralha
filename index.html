@@ -209,7 +209,8 @@ function stats(){
 }
 const xpNeed=l=>Math.round(10*Math.pow(1.2,l-1));
 const ATTR_MAX=100; // nível máximo de cada atributo
-const attrCost=n=>5*2**n; // 5, 10, 20, 40, 80... (dobra a cada compra)
+// Dobra até 80 gold (5, 10, 20, 40, 80) e depois sobe +7% por compra, para o nível 100 ser alcançável.
+const attrCost=n=>n<=4?5*2**n:Math.round(80*1.07**(n-4));
 // Curva de dificuldade (fases avançadas): vida x1,15 por fase, velocidade até 1,8x, gold e preço das cartas +10% por fase.
 const phaseGold=()=>1+.1*(S.phase-1);
 const cardCost=c=>Math.round(c.p*.4*phaseGold());
