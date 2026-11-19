@@ -72,6 +72,7 @@ p{margin:0;color:var(--muted);line-height:1.45}
   <p>Cada fase começa do zero: nível, cartas e evoluções de arma valem só naquela fase. O que fica para sempre é o que você compra na Loja: atributos e armas. Se perder, o gold volta ao que era no começo da fase.</p>
   <p id="hubInfo"></p>
   <button class="btn" id="btnStart">Jogar</button>
+  <button class="btn" id="btnHard" hidden style="background:#c8402f;color:#fff">🔥 Fase bônus difícil<br><small style="font-weight:700">Muito gold, 1 tentativa só</small></button>
   <button class="btn ghost" id="btnArms">Armas</button>
   <button class="btn ghost" id="btnShop">Loja</button>
   <button class="btn ghost" id="btnQuit">Sair</button>
@@ -379,7 +380,14 @@ const BON={cora:{col:0xe2574c,n:'+1 coração'},ouro:{col:0xe8b14a,n:'+30 gold'}
 
 // ---------- partida ----------
 function clearWorld(){ if(!run) return; [...run.en,...run.ar,...run.bo,...run.fx].forEach(o=>scene.remove(o.m)); }
-function startPhase(keep){
+// Fase Bônus Difícil: libera a cada 5 fases vencidas, 1 tentativa. Inimigos mais fortes, rápidos e numerosos; gold x3 e prêmio grande.
+let HARD=false;
+const HARD_WAVES=4;
+const hardLvl=()=>Math.floor((S.phase-1)/5); // quantas fases bônus já liberou
+const hardAvail=()=>hardLvl()>(S.hardDone||0);
+function hardReward(){return Math.round(120*S.phase*stats().goldm);}
+function startPhase(keep,hard){
+  HARD=!!hard;
   const pend=keep&&run?run.pendingLv:0;
   clearWorld();
   resetPhaseStuff();
@@ -389,12 +397,13 @@ function startPhase(keep){
     hp:st.maxH,fireT:0,helpT:0,babyT:1,twinT:1.6,bonT:5,rainT:15,shieldT:0,shield:st.esc,triple:0,slowAll:0,pendingLv:pend,done:false};
   player.position.x=0; player.position.z=PZ; targetX=0; targetZ=PZ;
   ground.material.color.setHex(era().ground); lane.material.color.setHex(era().lane);
-  syncUnits(); hud(); toast('Fase '+S.phase+': '+era().n);
+  if(HARD){const red=new THREE.Color(1,.68,.62);ground.material.color.multiply(red);lane.material.color.multiply(red);}
+  syncUnits(); hud(); if(HARD){banner('BÔNUS DIFÍCIL');toast('Muito gold, muito perigo!');}else toast('Fase '+S.phase+': '+era().n);
 }
-function waveCount(w){return 6+2*w+Math.min(30,Math.round(.8*(S.phase-1)));}
+function waveCount(w){return Math.round((6+2*w+Math.min(30,Math.round(.8*(S.phase-1))))*(HARD?1.5:1));}
 // Vida dos inimigos pensada para 200+ fases: x7 na fase 20, x23 na 50, x65 na 100, x209 na 200 (fase 1 pela metade).
-function hpScale(){const q=S.phase-1;return (1+.25*q+.004*q*q)*(S.phase===1?.5:1);}
-function waveInterval(){return Math.max(.35,1.25-.03*S.phase-.05*run.wave);}
+function hpScale(){const q=S.phase-1;return (1+.25*q+.004*q*q)*(S.phase===1?.5:1)*(HARD?1.5:1);}
+function waveInterval(){return Math.max(HARD?.22:.35,(1.25-.03*S.phase-.05*run.wave)*(HARD?.6:1));}
 function pickType(){const w=run.wave,p=S.phase,pool=['goblin','goblin'];
   if(w>=2||p>1)pool.push('lobo'); if(w>=3||p>1)pool.push('morcego'); if(w>=4||p>1)pool.push('golem'); return pool[Math.random()*pool.length|0];}
 // Inimigo 2D desenhado: formato pela era, olhos bravos olhando para a muralha, asas no voador, chifres no chefe.
@@ -427,7 +436,8 @@ function spawn(type,x,z){
   const T=ETYPES[type],V=era()[type],sc=hpScale(),m=mkSprite(enemyTex(V,type),1,1,T.fly?1.6:1);
   const s=T.r*2*1.75; m.scale.set(s,s,1); m.material.rotation=0;
   m.position.set(x??(Math.random()*2-1)*HALF, T.fly?1.6:1, z??SPAWNZ); scene.add(m);
-  const e={m,type,T,hp:T.hp*sc,max:T.hp*sc,sp:T.sp*Math.min(1.8,1+.03*(S.phase-1)),r:T.r,x0:m.position.x,ph:Math.random()*6,burn:0,burnD:0,slow:0,sumT:4,s,wp:Math.random()*6,hitT:0,grow:T.boss?0:1};
+  const e={m,type,T,hp:T.hp*sc,max:T.hp*sc,sp:T.sp*Math.min(1.8,1+.03*(S.phase-1))*(HARD?1.3:1),r:T.r,x0:m.position.x,ph:Math.random()*6,burn:0,burnD:0,slow:0,sumT:4,s,wp:Math.random()*6,hitT:0,grow:T.boss?0:1};
+  if(HARD&&T.boss){e.hp*=1.6;e.max*=1.6;}
   run.en.push(e); if(T.boss) run.boss=e; return e;
 }
 function nearest(x,z){let b=null,bd=1e9;for(const e of run.en){const d=(e.m.position.x-x)**2+(e.m.position.z-z)**2;if(d<bd){bd=d;b=e;}}return b;}
@@ -450,7 +460,7 @@ function kill(e){
   sfx('kill'); scene.remove(e.m); run.en.splice(run.en.indexOf(e),1);
   {const p=e.m.position,z=e.s,B=e.T.boss;fxSprite(e.m.material.map,p,z,0xffffff,.22,(f)=>{const k=1-Math.max(0,f.life/f.max);f.m.scale.set(z*(1+.5*k),z*(1-.4*k),1);f.m.material.opacity=1-k;});
    burst(p,0xfff0c8,B?26:7,B?10:5,B?1.5:.75);if(B){ringFx(p,0xffffff,2,16,.6);shake(1);} coinFly(p,B?12:(e.T.g>=10?3:1));}
-  const st=stats(); addGold(Math.round(e.T.g*st.goldm*phaseGold())); gainXp(e.T.xp*st.xpm);
+  const st=stats(); addGold(Math.round(e.T.g*st.goldm*phaseGold()*(HARD?3:1))); gainXp(e.T.xp*st.xpm);
   if(st.vamp){run.kills=(run.kills||0)+1;if(run.kills%25===0&&run.hp<st.maxH){run.hp++;toast('Vampiro: +1 coração');}}
   if(e===run.boss){run.boss=null; phaseWon();}
 }
@@ -479,7 +489,8 @@ function loseHeart(){
   run.hp--; flash(0xe2574c); sfx('hurt'); archerHurt(player); shake(.9); bump($('hearts'));
   if(run.hp<=0&&revive())return;
   if(run.hp<=0){run.done=true; const k=Math.floor((run.earned||0)/2);
-    msg('Você foi alcançado!','Você volta ao menu e fica com metade do gold que ganhou nesta fase: +'+k+' gold.',()=>{keepHalf();carry=false;$('mCards').hidden=true;showHub();});}
+    const wasHard=HARD; HARD=false;
+    msg('Você foi alcançado!',(wasHard?'A fase bônus acabou (era só 1 tentativa). ':'')+'Você volta ao menu e fica com metade do gold que ganhou nesta fase: +'+k+' gold.',()=>{keepHalf();if(wasHard)S.hardDone=hardLvl();carry=false;$('mCards').hidden=true;showHub();});}
 }
 // Gold ganho na fase (inimigos, bônus). Se perder ou sair, fica com 50% dele.
 function addGold(v){S.gold+=v;if(run)run.earned=(run.earned||0)+v;}
@@ -493,7 +504,10 @@ function revive(){let from='';
   for(const e of [...run.en]){if(e!==run.boss){scene.remove(e.m);run.en.splice(run.en.indexOf(e),1);}}
   if(run.bossHp){const b=spawn('ogro',0);b.hp=Math.min(b.max,run.bossHp);run.bossHp=0;}
   toast('Anjo da Guarda: você reviveu!'+(from==='loja'?' (restam '+S.angel+')':''));save();return true;}
-function phaseWon(){run.done=true; const g=Math.round(25*S.phase*stats().goldm); S.gold+=g;
+function phaseWon(){run.done=true;
+  if(HARD){const g=hardReward();S.gold+=g;S.hardDone=hardLvl();HARD=false;
+    msg('Bônus difícil vencido!','Você aguentou o sufoco e ganhou '+g+' gold de prêmio, além do gold triplo dos inimigos. A próxima fase bônus libera daqui a 5 fases.',()=>{carry=false;showHub();});return;}
+  const g=Math.round(25*S.phase*stats().goldm); S.gold+=g;
   msg('Fase '+S.phase+' concluída!','Você ganhou '+g+' gold de recompensa. Nível, cartas e evoluções de arma ficam para trás; gold, atributos e armas da Loja continuam com você.',()=>{S.phase++;carry=true;showHub();});}
 // Bebê do Glitter: dano fixo (BABY), não usa atributos nem cartas.
 // Gêmeos do Glitter: a 1908 (menina) e o 0819 (menino), comprados separadamente.
@@ -640,7 +654,7 @@ function step(dt){
   if(!run.bossSpawned){
     if(run.toSpawn>0){run.spawnT-=dt;if(run.spawnT<=0){spawn(pickType());run.toSpawn--;run.spawnT=waveInterval();}}
     else if(run.en.length===0||(run.waveGap+=dt)>5){
-      run.waveGap=0; if(run.wave<5){run.wave++;run.toSpawn=waveCount(run.wave);toast('Onda '+run.wave);}
+      run.waveGap=0; if(run.wave<(HARD?HARD_WAVES:5)){run.wave++;run.toSpawn=waveCount(run.wave);toast('Onda '+run.wave);}
       else if(run.en.length===0){run.bossSpawned=true;spawn('ogro',0);banner('CHEFE!');toast(era().ogro.n);sfx('boss');shake(.7);}
     }
   }
@@ -684,7 +698,7 @@ function step(dt){
     {const g=e.grow<1?Math.max(.05,backOut(e.grow)):1,b=e.T.fly?Math.sin(e.wp*1.7)*.08:Math.abs(Math.sin(e.wp))*.07,h=e.hitT>0?e.hitT/.15:0,z=e.s*g;
      e.m.material.rotation=e.T.fly?Math.sin(e.wp*.8)*.12:Math.sin(e.wp)*.1; e.m.scale.set(z*(1-b*.6+h*.25),z*(1+b-h*.2),1);}
     if(e.T.fly)p.x=Math.max(-HALF,Math.min(HALF,e.x0+Math.sin(run.t*3+e.ph)*1.6));
-    if(e.T.boss){e.sumT-=dt;if(e.sumT<=0){e.sumT=5;spawn('goblin',p.x-1.5,p.z+1);spawn('goblin',p.x+1.5,p.z+1);}}
+    if(e.T.boss){e.sumT-=dt;if(e.sumT<=0){e.sumT=HARD?3:5;spawn('goblin',p.x-1.5,p.z+1);spawn('goblin',p.x+1.5,p.z+1);}}
     if(p.z<=PZ+e.r||(Math.abs(p.x-player.position.x)<e.r+.6&&Math.abs(p.z-PPZ)<e.r+.6)){scene.remove(e.m);run.en.splice(run.en.indexOf(e),1);
       if(e.T.boss){run.boss=null;run.bossHp=e.hp;run.hp=1;run.shield=false;} loseHeart(); if(run.done)return;}
   }
@@ -715,7 +729,7 @@ function flash(c){scene.background.setHex(c);clearTimeout(fl);fl=setTimeout(()=>
 let tt=null; function toast(t){const el=$('toast');el.textContent=t;el.style.opacity=1;clearTimeout(tt);tt=setTimeout(()=>el.style.opacity=0,1100);}
 function hud(){const st=stats();
   $('hearts').textContent='♥'.repeat(Math.max(0,run.hp))+'♡'.repeat(Math.max(0,st.maxH-run.hp));
-  $('phase').textContent=run.bossSpawned?'Fase '+S.phase+' · Chefe':'Fase '+S.phase+' · Onda '+run.wave+'/5';
+  $('phase').textContent=run.bossSpawned?(HARD?'Bônus difícil':'Fase '+S.phase)+' · Chefe':(HARD?'Bônus difícil':'Fase '+S.phase)+' · Onda '+run.wave+'/'+(HARD?HARD_WAVES:5);
   $('gold').textContent=S.gold+' gold'; $('lvl').textContent='Nv '+S.lvl+' · '+st.W.n;
   $('xp').style.width=(100*S.xp/xpNeed(S.lvl))+'%';
   $('bossbar').style.display=run.boss?'block':'none'; if(run.boss)$('bosshp').style.width=(100*run.boss.hp/run.boss.max)+'%';}
@@ -769,7 +783,7 @@ addEventListener('keydown',e=>{if(e.key==='Escape'||e.key==='p'||e.key==='P'){if
 $('pResume').onclick=()=>{$('mPause').hidden=true;};
 $('pSound').onclick=()=>{muted=!muted;$('pSound').textContent='Som: '+(muted?'desligado':'ligado');};
 $('pRestart').onclick=()=>{$('mPause').hidden=true;$('mCards').hidden=true;const k=keepHalf();startPhase();if(k)toast('+'+k+' gold guardado');};
-$('pMenu').onclick=()=>{$('mPause').hidden=true;$('mCards').hidden=true;keepHalf();clearWorld();run=null;carry=false;showHub();};
+$('pMenu').onclick=()=>{$('mPause').hidden=true;$('mCards').hidden=true;keepHalf();if(HARD){S.hardDone=hardLvl();HARD=false;}clearWorld();run=null;carry=false;showHub();};
 let carry=false;
 // Progresso salvo neste aparelho: sair e voltar continua de onde parou.
 const SAVE='arqueiro-save-v1';
@@ -778,7 +792,7 @@ function load(){try{const v=JSON.parse(localStorage.getItem(SAVE));if(!v||!v.att
   if(!v.wv){const up=i=>i>=3?i+1:i;v.owned=(v.owned||[0]).map(up);v.baseWeapon=up(v.baseWeapon||0);v.weapon=up(v.weapon||0);v.wv=2;} // Escopeta entrou no índice 3
   return Object.assign(fresh(),v);}catch(_){return null;}}
 function showHub(){resetPhaseStuff();save();$('testBar').hidden=location.hash!=='#teste';$('hubInfo').textContent='Fase '+S.phase+' ('+era().n+') · '+stats().W.n+' · '+S.gold+' gold';
-  $('btnStart').textContent='Jogar fase '+S.phase; $('mStart').hidden=false;}
+  $('btnStart').textContent='Jogar fase '+S.phase; $('btnHard').hidden=!hardAvail(); $('mStart').hidden=false;}
 $('btnShop').onclick=showAttrs;
 function showArms(){const L=$('armsList');L.innerHTML='';S.owned=S.owned||[0];
   S.owned.slice().sort((a,b)=>a-b).forEach(i=>{const w=WEAPONS[i],eq=i===(S.baseWeapon||0),b=document.createElement('button');b.className='card';
@@ -806,6 +820,8 @@ $('btnQuitBack').onclick=()=>{$('mQuit').hidden=true;};
 $('btnAttrClose').onclick=()=>{$('mAttr').hidden=true;if(!$('mStart').hidden)showHub();};
 let msgCb=null; function msg(t,x,cb){$('msgTitle').textContent=t;$('msgText').textContent=x;msgCb=cb;$('mMsg').hidden=false;}
 $('btnMsg').onclick=()=>{$('mMsg').hidden=true;const c=msgCb;msgCb=null;c&&c();};
+$('btnHard').onclick=()=>{try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();AC.resume();}catch(_){}
+  msg('Fase bônus difícil','Inimigos mais fortes, mais rápidos e em maior número, e um chefe reforçado. Cada inimigo dá 3x gold e vencer dá '+hardReward()+' gold de prêmio. Você só tem 1 tentativa: se perder ou sair, ela some até a próxima (a cada 5 fases).',()=>{$('mStart').hidden=true;startPhase(false,true);carry=false;});};
 $('btnStart').onclick=()=>{try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();AC.resume();}catch(_){}$('mStart').hidden=true;startPhase(false);carry=false;if(run.pendingLv)showCards();};
 
 function resize(){renderer.setSize(innerWidth,innerHeight);const asp=innerWidth/innerHeight;
