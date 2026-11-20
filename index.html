@@ -32,6 +32,9 @@ p{margin:0;color:var(--muted);line-height:1.45}
 .card .ic{font-family:var(--display);width:42px;height:42px;flex:none;border-radius:10px;display:grid;place-items:center;font-size:18px;color:#1a1306;background:var(--gold)}
 .card .tx{flex:1;min-width:0}.card b{display:block}.card small{color:var(--muted)}
 .card .pr{font-weight:800;color:var(--gold);font-variant-numeric:tabular-nums;white-space:nowrap}
+.badge{display:inline-grid;place-items:center;min-width:20px;height:20px;border-radius:10px;background:var(--red);color:#fff;font-size:12px;margin-left:6px;vertical-align:1px}
+.mbar{height:8px;border-radius:4px;background:rgba(0,0,0,.35);overflow:hidden;margin-top:6px}.mbar>i{display:block;height:100%;background:var(--gold)}
+.card.done{border-color:var(--gold)}
 .tag{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .btn{background:var(--gold);color:#241a06;border:0;border-radius:12px;padding:12px;font:800 16px var(--body);cursor:pointer}
 .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--panel2)}
@@ -72,6 +75,7 @@ p{margin:0;color:var(--muted);line-height:1.45}
   <p>Cada fase começa do zero: nível, cartas e evoluções de arma valem só naquela fase. O que fica para sempre é o que você compra na Loja: atributos e armas. Se perder, o gold volta ao que era no começo da fase.</p>
   <p id="hubInfo"></p>
   <button class="btn" id="btnStart">Jogar</button>
+  <button class="btn ghost" id="btnDaily">Missões diárias <span id="dailyBadge" class="badge" hidden>!</span></button>
   <button class="btn ghost" id="btnArms">Armas</button>
   <button class="btn ghost" id="btnShop">Loja</button>
   <button class="btn ghost" id="btnQuit">Sair</button>
@@ -97,6 +101,12 @@ p{margin:0;color:var(--muted);line-height:1.45}
   <h2>Até a próxima!</h2>
   <p>Seu progresso foi salvo. No app da Play Store este botão fecha o jogo; aqui no navegador, é só fechar a aba. Quando voltar, continua de onde parou.</p>
   <button class="btn ghost" id="btnQuitBack">Voltar ao menu</button>
+</div></div>
+<div class="modal" id="mDaily" hidden><div class="box">
+  <h2>Missões diárias</h2>
+  <p id="dailyInfo"></p>
+  <div id="dailyList" style="display:flex;flex-direction:column;gap:8px"></div>
+  <button class="btn" id="btnDailyClose">Voltar ao menu</button>
 </div></div>
 <div class="modal" id="mArms" hidden><div class="box">
   <h2>Armas</h2>
@@ -468,6 +478,7 @@ function kill(e){
    burst(p,0xfff0c8,B?26:7,B?10:5,B?1.5:.75);if(B){ringFx(p,0xffffff,2,16,.6);shake(1);} coinFly(p,B?12:(e.T.g>=10?3:1));}
   const st=stats(); addGold(Math.round(e.T.g*st.goldm*phaseGold()*(HARD?3:1))); gainXp(e.T.xp*st.xpm);
   if(st.vamp){run.kills=(run.kills||0)+1;if(run.kills%25===0&&run.hp<st.maxH){run.hp++;toast('Vampiro: +1 coração');}}
+  dailyAdd('kill');if(e.T.fly)dailyAdd('fly');if(e.type==='golem')dailyAdd('tank');if(e.T.boss)dailyAdd('boss');
   if(e===run.boss){run.boss=null; phaseWon();}
 }
 function gainXp(v){S.xp+=v; let up=false; while(S.xp>=xpNeed(S.lvl)){S.xp-=xpNeed(S.lvl);S.lvl++;run.pendingLv++;sfx('level');up=true;}
@@ -492,14 +503,49 @@ function hitEnemy(e,ar){
 }
 function loseHeart(){
   if(run.shield){run.shield=false;run.shieldT=30;toast('Escudo bloqueou!');{const p=player.position.clone();ringFx(p,0x9fdcff,3.4,7,.35);burst(p,0xbfe8ff,12,6,.6);shake(.4);}return;}
-  run.hp--; flash(0xe2574c); sfx('hurt'); archerHurt(player); shake(.9); bump($('hearts'));
+  run.hp--; run.hurt=1; flash(0xe2574c); sfx('hurt'); archerHurt(player); shake(.9); bump($('hearts'));
   if(run.hp<=0&&revive())return;
   if(run.hp<=0){run.done=true; const k=Math.floor((run.earned||0)/2);
     msg('Você foi alcançado!','Você volta ao menu e fica com metade do gold que ganhou nesta fase: +'+k+' gold.',()=>{keepHalf();carry=false;$('mCards').hidden=true;showHub();});}
 }
 // Gold ganho na fase (inimigos, bônus). Se perder ou sair, fica com 50% dele.
 function addGold(v){S.gold+=v;if(run)run.earned=(run.earned||0)+v;}
-function keepHalf(){const k=Math.floor((run&&run.earned||0)/2),used=run&&run.angelShop;S=clone(snap);S.gold+=k;if(used)S.angel=Math.max(0,(S.angel||0)-1);return k;}
+// ---------- Missões diárias ----------
+// 3 missões sorteadas por dia (mesmo sorteio o dia todo). Progresso conta em todas as partidas, até nas que você perde.
+// Completar as 3 libera o Baú do dia; fazer isso em dias seguidos aumenta a sequência e o baú.
+const MISSIONS={
+  kill:{n:150,t:n=>'Derrote '+n+' inimigos'},
+  fly:{n:40,t:n=>'Derrote '+n+' inimigos voadores'},
+  tank:{n:25,t:n=>'Derrote '+n+' inimigos grandões'},
+  boss:{n:2,t:n=>'Derrote '+n+' chefes'},
+  win:{n:3,t:n=>'Vença '+n+' fases'},
+  flaw:{n:1,t:n=>'Vença uma fase sem perder coração'},
+  bonus:{n:8,t:n=>'Pegue '+n+' bônus na pista'},
+  cards:{n:10,t:n=>'Escolha '+n+' cartas'},
+  gold:{n:5,t:n=>'Pegue '+n+' sacos de ouro'},
+};
+function dayKey(d){d=d||new Date();return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();}
+function ensureDaily(){const k=dayKey();if(S.daily&&S.daily.day===k)return S.daily;
+  let h=0;for(const ch of k+(S.seed||7))h=(h*31+ch.charCodeAt(0))>>>0;
+  const ids=Object.keys(MISSIONS),pick=[];while(pick.length<3){h=(h*1103515245+12345)>>>0;const id=ids[h%ids.length];if(!pick.includes(id))pick.push(id);}
+  const y=new Date();y.setDate(y.getDate()-1);const prev=S.daily||{};
+  const streak=prev.chest&&prev.day===dayKey(y)?(prev.streak||1):0; // sequência continua se abriu o baú ontem
+  S.daily={day:k,m:pick.map(id=>({id,p:0,c:false})),chest:false,streak};return S.daily;}
+function dailyReward(){return 50*Math.max(1,S.phase);}
+function chestReward(){const d=ensureDaily();return 100*Math.max(1,S.phase)*Math.min(7,d.streak+1);}
+function dailyAdd(id,v){const d=ensureDaily();for(const m of d.m){if(m.id!==id||m.c)continue;const N=MISSIONS[id].n,was=m.p>=N;m.p=Math.min(N,m.p+(v||1));
+  if(!was&&m.p>=N){banner('MISSÃO CONCLUÍDA!');$('banner').style.color='#e8b14a';setTimeout(()=>$('banner').style.color='',1800);}}}
+function dailyClaimable(){const d=ensureDaily();return d.m.some(m=>!m.c&&m.p>=MISSIONS[m.id].n)||(!d.chest&&d.m.every(m=>m.c));}
+function showDaily(){const d=ensureDaily(),L=$('dailyList');L.innerHTML='';
+  $('dailyInfo').textContent='Renova à meia-noite. Cada missão dá '+dailyReward()+' gold. Sequência: '+d.streak+(d.streak===1?' dia':' dias')+'.';
+  for(const m of d.m){const M=MISSIONS[m.id],ok=m.p>=M.n,b=document.createElement('button');b.className='card'+(m.c?' done':ok?'':' off');
+    b.innerHTML=`<span class="ic">${m.c?'✓':'★'}</span><span class="tx"><b>${M.t(M.n)}</b><small>${m.p}/${M.n}</small><div class="mbar"><i style="width:${100*m.p/M.n}%"></i></div></span><span class="pr">${m.c?'Feito':ok?'Pegar':dailyReward()+' gold'}</span>`;
+    b.onclick=()=>{if(m.c)return;if(!ok){toast('Ainda não completou');return;}m.c=true;S.gold+=dailyReward();sfx('bonus');toast('+'+dailyReward()+' gold');save();showDaily();};L.appendChild(b);}
+  const all=d.m.every(m=>m.c),b=document.createElement('button');b.className='card'+(d.chest?' done':all?'':' off');
+  b.innerHTML=`<span class="ic">🎁</span><span class="tx"><b>Baú do dia</b><small>Complete as 3 missões. Dias seguidos deixam o baú maior (até 7x).</small></span><span class="pr">${d.chest?'Aberto':all?'Abrir':chestReward()+' gold'}</span>`;
+  b.onclick=()=>{if(d.chest)return;if(!all){toast('Complete as 3 missões');return;}const g=chestReward();d.chest=true;d.streak++;S.gold+=g;sfx('level');toast('Baú: +'+g+' gold');save();showDaily();};L.appendChild(b);
+  $('mStart').hidden=true;$('mDaily').hidden=false;}
+function keepHalf(){const k=Math.floor((run&&run.earned||0)/2),used=run&&run.angelShop,dl=S.daily;S=clone(snap);S.daily=dl;S.gold+=k;if(used)S.angel=Math.max(0,(S.angel||0)-1);return k;}
 // Anjo da Guarda: carta da fase (1 vez) ou da Loja (gasta 1). Revive com vida cheia e limpa a tela.
 function revive(){let from='';
   if(S.cards.anjo&&!run.angelCard){run.angelCard=true;from='carta';}
@@ -509,7 +555,7 @@ function revive(){let from='';
   for(const e of [...run.en]){if(e!==run.boss){scene.remove(e.m);run.en.splice(run.en.indexOf(e),1);}}
   if(run.bossHp){const b=spawn('ogro',0);b.hp=Math.min(b.max,run.bossHp);run.bossHp=0;}
   toast('Anjo da Guarda: você reviveu!'+(from==='loja'?' (restam '+S.angel+')':''));save();return true;}
-function phaseWon(){run.done=true;
+function phaseWon(){run.done=true; dailyAdd('win'); if(!run.hurt)dailyAdd('flaw');
   if(HARD){const g=hardReward();S.gold+=g;
     msg('Fase difícil vencida!','Você aguentou o sufoco e ganhou '+g+' gold de prêmio, além do gold triplo dos inimigos.',()=>{S.phase++;carry=true;showHub();});return;}
   const g=Math.round(25*S.phase*stats().goldm); S.gold+=g;
@@ -639,7 +685,7 @@ addEventListener('keydown',e=>keys[e.key.length==1?e.key.toLowerCase():e.key]=1)
 
 // ---------- loop ----------
 let last=performance.now();
-function paused(){return !$('mArms').hidden||!$('mPause').hidden||!$('mCards').hidden||!$('mAttr').hidden||!$('mMsg').hidden||!$('mStart').hidden;}
+function paused(){return !$('mArms').hidden||!$('mDaily').hidden||!$('mPause').hidden||!$('mCards').hidden||!$('mAttr').hidden||!$('mMsg').hidden||!$('mStart').hidden;}
 function step(dt){
   const st=stats(); run.t+=dt;
   if(run.lvT>0){run.lvT-=dt;if(run.lvT<=0&&run.pendingLv&&!paused())showCards();}
@@ -717,7 +763,7 @@ function step(dt){
       fxSprite(bonusTex(b.k),p,1.7,0xffffff,.3,(f)=>{const k=1-Math.max(0,f.life/f.max),z=1.7*(1+k*1.2);f.m.scale.set(z,z,1);f.m.material.opacity=1-k;});ringFx(p,0xfff3b0,1,4,.35);if(b.k==='ouro')coinFly(p,5);
       let msgB=BON[b.k].n;
       if(b.k==='cora'){if(run.hp<st.maxH)run.hp++;else{addGold(250);msgB='Vida cheia: +250 gold';}}
-      if(b.k==='ouro')addGold(30); if(b.k==='flecha')run.triple=8; if(b.k==='relogio')run.slowAll=5; toast(msgB);sfx('bonus');}
+      dailyAdd('bonus'); if(b.k==='ouro'){addGold(30);dailyAdd('gold');} if(b.k==='flecha')run.triple=8; if(b.k==='relogio')run.slowAll=5; toast(msgB);sfx('bonus');}
     else if(p.z<PZ-1){scene.remove(b.m);run.bo.splice(run.bo.indexOf(b),1);}}
   for(const f of [...run.fx]){f.life-=dt;if(f.upd)f.upd(f,dt);if(f.life<=0){scene.remove(f.m);if(f.own)f.m.material.dispose();run.fx.splice(run.fx.indexOf(f),1);}}
 }
@@ -749,7 +795,7 @@ function showCards(){
   const L=$('cardList');L.innerHTML='';
   for(const c of pick){const luck=!free&&S.cards.sorte&&Math.random()<.1,cost=free||luck?0:cardCost(c),ok=S.gold>=cost,b=document.createElement('button');b.className='card'+(ok?'':' off');
     b.innerHTML=`<span class="ic">${c.ic}</span><span class="tx"><span class="tag">${c.t}</span><b>${c.n}</b><small>${c.d}</small></span><span class="pr">${cost?cost+' gold':(luck?'Grátis (Sorte)':'Grátis')}</span>`;
-    b.onclick=()=>{if(!ok){toast('Gold insuficiente');return;}S.gold-=cost;if(c.id==='_arma'){S.weapon=(S.weapon||0)+1;toast('Nova arma: '+WEAPONS[S.weapon].n);}else S.cards[c.id]=(S.cards[c.id]||0)+1;syncUnits();nextCard();};L.appendChild(b);}
+    b.onclick=()=>{if(!ok){toast('Gold insuficiente');return;}S.gold-=cost;if(c.id==='_arma'){S.weapon=(S.weapon||0)+1;toast('Nova arma: '+WEAPONS[S.weapon].n);}else S.cards[c.id]=(S.cards[c.id]||0)+1;dailyAdd('cards');syncUnits();nextCard();};L.appendChild(b);}
   $('mCards').hidden=false;
 }
 function nextCard(){run.pendingLv--;$('mCards').hidden=true;if(run.pendingLv>0)showCards();}
@@ -796,7 +842,7 @@ function save(){try{localStorage.setItem(SAVE,JSON.stringify(S));}catch(_){}}
 function load(){try{const v=JSON.parse(localStorage.getItem(SAVE));if(!v||!v.attrs)return null;
   if(!v.wv){const up=i=>i>=3?i+1:i;v.owned=(v.owned||[0]).map(up);v.baseWeapon=up(v.baseWeapon||0);v.weapon=up(v.weapon||0);v.wv=2;} // Escopeta entrou no índice 3
   return Object.assign(fresh(),v);}catch(_){return null;}}
-function showHub(){resetPhaseStuff();save();$('testBar').hidden=location.hash!=='#teste';$('hubInfo').textContent='Fase '+S.phase+' ('+era().n+') · '+stats().W.n+' · '+S.gold+' gold';
+function showHub(){resetPhaseStuff();ensureDaily();save();$('dailyBadge').hidden=!dailyClaimable();$('testBar').hidden=location.hash!=='#teste';$('hubInfo').textContent='Fase '+S.phase+' ('+era().n+') · '+stats().W.n+' · '+S.gold+' gold';
   $('btnStart').textContent='Jogar fase '+S.phase; $('mStart').hidden=false;}
 $('btnShop').onclick=showAttrs;
 function showArms(){const L=$('armsList');L.innerHTML='';S.owned=S.owned||[0];
@@ -814,6 +860,8 @@ function showArms(){const L=$('armsList');L.innerHTML='';S.owned=S.owned||[0];
     b.onclick=()=>{S.helperOn=!S.helperOn;showArms();};L.appendChild(b);}
   $('mArms').hidden=false;}
 $('btnArms').onclick=showArms;
+$('btnDaily').onclick=showDaily;
+$('btnDailyClose').onclick=()=>{$('mDaily').hidden=true;showHub();};
 $('btnArmsClose').onclick=()=>{$('mArms').hidden=true;showHub();};
 // Modo de teste: abra o jogo com #teste no fim do link.
 $('tPrev').onclick=()=>{S.phase=Math.max(1,S.phase-5);showHub();};
