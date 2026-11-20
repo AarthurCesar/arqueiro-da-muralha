@@ -72,7 +72,6 @@ p{margin:0;color:var(--muted);line-height:1.45}
   <p>Cada fase começa do zero: nível, cartas e evoluções de arma valem só naquela fase. O que fica para sempre é o que você compra na Loja: atributos e armas. Se perder, o gold volta ao que era no começo da fase.</p>
   <p id="hubInfo"></p>
   <button class="btn" id="btnStart">Jogar</button>
-  <button class="btn" id="btnHard" hidden style="background:#c8402f;color:#fff">🔥 Fase bônus difícil<br><small style="font-weight:700">Muito gold, 1 tentativa só</small></button>
   <button class="btn ghost" id="btnArms">Armas</button>
   <button class="btn ghost" id="btnShop">Loja</button>
   <button class="btn ghost" id="btnQuit">Sair</button>
@@ -161,7 +160,7 @@ const ETYPES={
  lobo:{hp:2,sp:4.0,r:.5,col:0x9a9a9a,xp:1,g:4,shape:'cone'},
  golem:{hp:10,sp:1.2,r:.8,col:0x7d6a55,xp:3,g:10,shape:'box'},
  morcego:{hp:2,sp:2.6,r:.45,col:0x8a5cc4,xp:1,g:4,shape:'sph',fly:1},
- ogro:{hp:45,sp:.75,r:1.4,col:0xc44a3a,xp:12,g:60,shape:'box',boss:1},
+ ogro:{hp:180,sp:.75,r:1.4,col:0xc44a3a,xp:12,g:60,shape:'box',boss:1},
 };
 // Eras: os inimigos evoluem junto com as armas (comum, rápido, tanque, voador, chefe).
 const E=(n,col,shape)=>({n,col,shape});
@@ -338,8 +337,13 @@ function animArcher(g,dt){if(!g)return;const u=g.userData,sp=g.position.distance
   u.spr.material.color.setHex(h>0&&(u.hurt*20|0)%2?0xff6060:u.tint);}
 const player=mkArcher(archTex,3); player.position.set(0,0,PZ);
 let helper=null, knight=null;
-const shieldMesh=new THREE.Mesh(new THREE.SphereGeometry(1,16,12),new THREE.MeshBasicMaterial({color:0x7fc8ff,transparent:true,opacity:.22}));
-shieldMesh.position.y=.8; shieldMesh.scale.setScalar(1.5); player.add(shieldMesh);
+// Escudo 2D: bolha transparente com borda brilhante que gira devagar e pulsa.
+const shieldTex=canvasTex(256,256,(x)=>{const g=x.createRadialGradient(128,128,60,128,128,122);g.addColorStop(0,'rgba(140,210,255,0)');g.addColorStop(.75,'rgba(140,210,255,.18)');g.addColorStop(.93,'rgba(170,225,255,.75)');g.addColorStop(1,'rgba(170,225,255,0)');
+  x.fillStyle=g;x.beginPath();x.arc(128,128,124,0,7);x.fill();x.strokeStyle='rgba(235,250,255,.9)';x.lineWidth=7;x.lineCap='round';
+  for(const [a,b] of [[3.6,4.4],[.5,.9]]){x.beginPath();x.arc(128,128,104,a,b);x.stroke();}
+  x.fillStyle='rgba(255,255,255,.8)';x.beginPath();x.ellipse(84,70,14,7,-.7,0,7);x.fill();});
+const shieldMesh=mkSprite(shieldTex,3.4,3.4,2.2); shieldMesh.material.depthWrite=false; player.add(shieldMesh);
+function animShield(dt,t){if(!shieldMesh.visible)return;const k=1+.05*Math.sin(t*4);shieldMesh.scale.set(3.4*k,3.4*k,1);shieldMesh.material.rotation+=dt*.7;shieldMesh.material.opacity=.85+.15*Math.sin(t*6);}
 
 const geo={box:new THREE.BoxGeometry(1,1,1),cone:new THREE.ConeGeometry(.6,1.2,8),sph:new THREE.SphereGeometry(.6,12,10),cyl:new THREE.CylinderGeometry(.55,.55,.8,12),oct:new THREE.OctahedronGeometry(.65),disc:new THREE.CylinderGeometry(.75,.75,.25,18)};
 const arrowGeo=new THREE.CylinderGeometry(.05,.05,.9,6); arrowGeo.rotateX(Math.PI/2);
@@ -380,14 +384,16 @@ const BON={cora:{col:0xe2574c,n:'+1 coração'},ouro:{col:0xe8b14a,n:'+30 gold'}
 
 // ---------- partida ----------
 function clearWorld(){ if(!run) return; [...run.en,...run.ar,...run.bo,...run.fx].forEach(o=>scene.remove(o.m)); }
-// Fase Bônus Difícil: libera a cada 5 fases vencidas, 1 tentativa. Inimigos mais fortes, rápidos e numerosos; gold x3 e prêmio grande.
+// Fase Difícil: 1 fase surpresa por mapa (a cada 5 fases), sorteada e obrigatória. Só se descobre ao entrar.
+// Inimigos bem mais fortes, rápidos e numerosos; gold x3 e prêmio grande.
 let HARD=false;
-const HARD_WAVES=4;
-const hardLvl=()=>Math.floor((S.phase-1)/5); // quantas fases bônus já liberou
-const hardAvail=()=>hardLvl()>(S.hardDone||0);
+const HARD_WAVES=5;
+function isHardPhase(p){const k=Math.floor((p-1)/5);if(!S.seed)S.seed=1+(Math.random()*1e6|0);
+  const h=Math.abs(Math.sin(S.seed*.0137+k*12.9898)*43758.5453)%1,lo=k===0?2:1; // no 1º mapa nunca é a fase 1
+  return p===5*k+lo+Math.floor(h*(6-lo));}
 function hardReward(){return Math.round(120*S.phase*stats().goldm);}
-function startPhase(keep,hard){
-  HARD=!!hard;
+function startPhase(keep){
+  HARD=isHardPhase(S.phase);
   const pend=keep&&run?run.pendingLv:0;
   clearWorld();
   resetPhaseStuff();
@@ -398,11 +404,11 @@ function startPhase(keep,hard){
   player.position.x=0; player.position.z=PZ; targetX=0; targetZ=PZ;
   ground.material.color.setHex(era().ground); lane.material.color.setHex(era().lane);
   if(HARD){const red=new THREE.Color(1,.68,.62);ground.material.color.multiply(red);lane.material.color.multiply(red);}
-  syncUnits(); hud(); if(HARD){banner('BÔNUS DIFÍCIL');toast('Muito gold, muito perigo!');}else toast('Fase '+S.phase+': '+era().n);
+  syncUnits(); hud(); if(HARD){banner('FASE DIFÍCIL!');toast('Surpresa! Muito gold, muito perigo');sfx('boss');shake(.6);}else toast('Fase '+S.phase+': '+era().n);
 }
 function waveCount(w){return Math.round((6+2*w+Math.min(30,Math.round(.8*(S.phase-1))))*(HARD?1.5:1));}
 // Vida dos inimigos pensada para 200+ fases: x7 na fase 20, x23 na 50, x65 na 100, x209 na 200 (fase 1 pela metade).
-function hpScale(){const q=S.phase-1;return (1+.25*q+.004*q*q)*(S.phase===1?.5:1)*(HARD?1.5:1);}
+function hpScale(){const q=S.phase-1;return (1+.25*q+.004*q*q)*(S.phase===1?.5:1)*(HARD?2.5:1);}
 function waveInterval(){return Math.max(HARD?.22:.35,(1.25-.03*S.phase-.05*run.wave)*(HARD?.6:1));}
 function pickType(){const w=run.wave,p=S.phase,pool=['goblin','goblin'];
   if(w>=2||p>1)pool.push('lobo'); if(w>=3||p>1)pool.push('morcego'); if(w>=4||p>1)pool.push('golem'); return pool[Math.random()*pool.length|0];}
@@ -485,12 +491,11 @@ function hitEnemy(e,ar){
   if(st.raio){let n=0;const mx=ar.half?1:3;for(const o of run.en){if(o===e||n>=mx)continue;if(o.m.position.distanceTo(e.m.position)<4.5){hurt(o,ar.dmg*.6);lightning(e.m.position,o.m.position);n++;}}}
 }
 function loseHeart(){
-  if(run.shield){run.shield=false;run.shieldT=30;toast('Escudo bloqueou!');return;}
+  if(run.shield){run.shield=false;run.shieldT=30;toast('Escudo bloqueou!');{const p=player.position.clone();ringFx(p,0x9fdcff,3.4,7,.35);burst(p,0xbfe8ff,12,6,.6);shake(.4);}return;}
   run.hp--; flash(0xe2574c); sfx('hurt'); archerHurt(player); shake(.9); bump($('hearts'));
   if(run.hp<=0&&revive())return;
   if(run.hp<=0){run.done=true; const k=Math.floor((run.earned||0)/2);
-    const wasHard=HARD; HARD=false;
-    msg('Você foi alcançado!',(wasHard?'A fase bônus acabou (era só 1 tentativa). ':'')+'Você volta ao menu e fica com metade do gold que ganhou nesta fase: +'+k+' gold.',()=>{keepHalf();if(wasHard)S.hardDone=hardLvl();carry=false;$('mCards').hidden=true;showHub();});}
+    msg('Você foi alcançado!','Você volta ao menu e fica com metade do gold que ganhou nesta fase: +'+k+' gold.',()=>{keepHalf();carry=false;$('mCards').hidden=true;showHub();});}
 }
 // Gold ganho na fase (inimigos, bônus). Se perder ou sair, fica com 50% dele.
 function addGold(v){S.gold+=v;if(run)run.earned=(run.earned||0)+v;}
@@ -505,8 +510,8 @@ function revive(){let from='';
   if(run.bossHp){const b=spawn('ogro',0);b.hp=Math.min(b.max,run.bossHp);run.bossHp=0;}
   toast('Anjo da Guarda: você reviveu!'+(from==='loja'?' (restam '+S.angel+')':''));save();return true;}
 function phaseWon(){run.done=true;
-  if(HARD){const g=hardReward();S.gold+=g;S.hardDone=hardLvl();HARD=false;
-    msg('Bônus difícil vencido!','Você aguentou o sufoco e ganhou '+g+' gold de prêmio, além do gold triplo dos inimigos. A próxima fase bônus libera daqui a 5 fases.',()=>{carry=false;showHub();});return;}
+  if(HARD){const g=hardReward();S.gold+=g;
+    msg('Fase difícil vencida!','Você aguentou o sufoco e ganhou '+g+' gold de prêmio, além do gold triplo dos inimigos.',()=>{S.phase++;carry=true;showHub();});return;}
   const g=Math.round(25*S.phase*stats().goldm); S.gold+=g;
   msg('Fase '+S.phase+' concluída!','Você ganhou '+g+' gold de recompensa. Nível, cartas e evoluções de arma ficam para trás; gold, atributos e armas da Loja continuam com você.',()=>{S.phase++;carry=true;showHub();});}
 // Bebê do Glitter: dano fixo (BABY), não usa atributos nem cartas.
@@ -665,7 +670,7 @@ function step(dt){
     if(twin){run.twinT-=dt;if(run.twinT<=0){run.twinT=TWIN.every;throwGlitter(twin.position,TWIN);}}}
   run.triple=Math.max(0,run.triple-dt); run.slowAll=Math.max(0,run.slowAll-dt);
   if(st.esc&&!run.shield){run.shieldT-=dt;if(run.shieldT<=0)run.shield=true;}
-  shieldMesh.visible=run.shield;
+  if(run.shield&&!shieldMesh.visible){const p=player.position.clone();ringFx(p,0x9fdcff,5,3.4,.3);} shieldMesh.visible=run.shield; animShield(dt,run.t);
   if(st.chuva){run.rainT-=dt;if(run.rainT<=0){run.rainT=15;flash(0xe8b14a);for(const e of [...run.en])hurt(e,st.dmg*2);toast('Chuva de flechas!');}}
   // flechas
   for(const a of [...run.ar]){
@@ -729,7 +734,7 @@ function flash(c){scene.background.setHex(c);clearTimeout(fl);fl=setTimeout(()=>
 let tt=null; function toast(t){const el=$('toast');el.textContent=t;el.style.opacity=1;clearTimeout(tt);tt=setTimeout(()=>el.style.opacity=0,1100);}
 function hud(){const st=stats();
   $('hearts').textContent='♥'.repeat(Math.max(0,run.hp))+'♡'.repeat(Math.max(0,st.maxH-run.hp));
-  $('phase').textContent=run.bossSpawned?(HARD?'Bônus difícil':'Fase '+S.phase)+' · Chefe':(HARD?'Bônus difícil':'Fase '+S.phase)+' · Onda '+run.wave+'/'+(HARD?HARD_WAVES:5);
+  $('phase').textContent=run.bossSpawned?'Fase '+S.phase+(HARD?' 🔥':'')+' · Chefe':'Fase '+S.phase+(HARD?' 🔥':'')+' · Onda '+run.wave+'/'+(HARD?HARD_WAVES:5);
   $('gold').textContent=S.gold+' gold'; $('lvl').textContent='Nv '+S.lvl+' · '+st.W.n;
   $('xp').style.width=(100*S.xp/xpNeed(S.lvl))+'%';
   $('bossbar').style.display=run.boss?'block':'none'; if(run.boss)$('bosshp').style.width=(100*run.boss.hp/run.boss.max)+'%';}
@@ -783,7 +788,7 @@ addEventListener('keydown',e=>{if(e.key==='Escape'||e.key==='p'||e.key==='P'){if
 $('pResume').onclick=()=>{$('mPause').hidden=true;};
 $('pSound').onclick=()=>{muted=!muted;$('pSound').textContent='Som: '+(muted?'desligado':'ligado');};
 $('pRestart').onclick=()=>{$('mPause').hidden=true;$('mCards').hidden=true;const k=keepHalf();startPhase();if(k)toast('+'+k+' gold guardado');};
-$('pMenu').onclick=()=>{$('mPause').hidden=true;$('mCards').hidden=true;keepHalf();if(HARD){S.hardDone=hardLvl();HARD=false;}clearWorld();run=null;carry=false;showHub();};
+$('pMenu').onclick=()=>{$('mPause').hidden=true;$('mCards').hidden=true;keepHalf();clearWorld();run=null;carry=false;showHub();};
 let carry=false;
 // Progresso salvo neste aparelho: sair e voltar continua de onde parou.
 const SAVE='arqueiro-save-v1';
@@ -792,7 +797,7 @@ function load(){try{const v=JSON.parse(localStorage.getItem(SAVE));if(!v||!v.att
   if(!v.wv){const up=i=>i>=3?i+1:i;v.owned=(v.owned||[0]).map(up);v.baseWeapon=up(v.baseWeapon||0);v.weapon=up(v.weapon||0);v.wv=2;} // Escopeta entrou no índice 3
   return Object.assign(fresh(),v);}catch(_){return null;}}
 function showHub(){resetPhaseStuff();save();$('testBar').hidden=location.hash!=='#teste';$('hubInfo').textContent='Fase '+S.phase+' ('+era().n+') · '+stats().W.n+' · '+S.gold+' gold';
-  $('btnStart').textContent='Jogar fase '+S.phase; $('btnHard').hidden=!hardAvail(); $('mStart').hidden=false;}
+  $('btnStart').textContent='Jogar fase '+S.phase; $('mStart').hidden=false;}
 $('btnShop').onclick=showAttrs;
 function showArms(){const L=$('armsList');L.innerHTML='';S.owned=S.owned||[0];
   S.owned.slice().sort((a,b)=>a-b).forEach(i=>{const w=WEAPONS[i],eq=i===(S.baseWeapon||0),b=document.createElement('button');b.className='card';
@@ -820,8 +825,6 @@ $('btnQuitBack').onclick=()=>{$('mQuit').hidden=true;};
 $('btnAttrClose').onclick=()=>{$('mAttr').hidden=true;if(!$('mStart').hidden)showHub();};
 let msgCb=null; function msg(t,x,cb){$('msgTitle').textContent=t;$('msgText').textContent=x;msgCb=cb;$('mMsg').hidden=false;}
 $('btnMsg').onclick=()=>{$('mMsg').hidden=true;const c=msgCb;msgCb=null;c&&c();};
-$('btnHard').onclick=()=>{try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();AC.resume();}catch(_){}
-  msg('Fase bônus difícil','Inimigos mais fortes, mais rápidos e em maior número, e um chefe reforçado. Cada inimigo dá 3x gold e vencer dá '+hardReward()+' gold de prêmio. Você só tem 1 tentativa: se perder ou sair, ela some até a próxima (a cada 5 fases).',()=>{$('mStart').hidden=true;startPhase(false,true);carry=false;});};
 $('btnStart').onclick=()=>{try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();AC.resume();}catch(_){}$('mStart').hidden=true;startPhase(false);carry=false;if(run.pendingLv)showCards();};
 
 function resize(){renderer.setSize(innerWidth,innerHeight);const asp=innerWidth/innerHeight;
