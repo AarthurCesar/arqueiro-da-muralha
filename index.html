@@ -557,7 +557,7 @@ function showDaily(){const d=ensureDaily(),L=$('dailyList');L.innerHTML='';
 // Jornada: 5 eras (a última vai até a fase 200), com um trecho de história e o chefe de cada era.
 const STORY=['Goblins e lobos saem da floresta. A muralha ainda aguenta.','Piratas atacam pelo rio, com escadas e gritos de guerra.','Soldados e tanques empurram os portões. O reino pede arqueiros.','Robôs das fábricas marcham em fila. A muralha precisa de reforço.','Naves descem sobre a muralha. Vença até a fase 200 e feche o céu.'];
 function showJourney(){const p=S.phase;
-  $('journeyGoal').textContent=S.won?'Jogo zerado! Você segue no modo infinito.':'Meta: vencer a fase 200 para zerar o jogo. Você está na fase '+p+'.';
+  $('journeyGoal').textContent=S.won?'História concluída! Agora o objetivo é bater seu recorde: fase '+(S.best||0)+'.':'Meta: vencer a fase 200 para fechar a história. Você está na fase '+p+' · recorde: '+(S.best||0)+'.';
   $('journeyBar').style.width=(S.won?100:Math.max(0,Math.min(100,(p-1)/199*100)))+'%';
   const L=$('journeyList');L.innerHTML='';
   ERAS.forEach((E,i)=>{const from=i*5+1,to=i===ERAS.length-1?200:i*5+5,last=i===ERAS.length-1;
@@ -580,10 +580,10 @@ function revive(){let from='';
   if(run.bossHp){const b=spawn('ogro',0);b.hp=Math.min(b.max,run.bossHp);run.bossHp=0;}
   toast('Anjo da Guarda: você reviveu!'+(from==='loja'?' (restam '+S.angel+')':''));save();return true;}
 // Objetivo: zerar vencendo a fase 200 (chefe final). Depois disso o jogo segue em modo infinito.
-function phaseWon(){run.done=true; dailyAdd('win'); if(!run.hurt)dailyAdd('flaw');
+function phaseWon(){run.done=true; S.best=Math.max(S.best||0,S.phase); dailyAdd('win'); if(!run.hurt)dailyAdd('flaw');
   const last=S.phase===200&&!S.won, eraEnd=S.phase%5===0&&S.phase<=20&&!last;
   const nxt=()=>{S.phase++;carry=true;showHub();};
-  const after=()=>{if(last){S.won=true;msg('Você zerou o jogo!','Você derrotou o chefe final e fechou o céu sobre a muralha. O jogo continua no modo infinito: a próxima fase é a 201.',nxt);}else nxt();};
+  const after=()=>{if(last){S.won=true;msg('Você fechou a história!','Você derrotou o chefe final e fechou o céu sobre a muralha. A história acaba aqui. O modo infinito começa na fase 201, e seu recorde de fase fica salvo.',nxt);}else nxt();};
   const era2=eraEnd?' Portal da era '+ERAS[S.phase/5-1].n+' fechado. Próxima era: '+ERAS[S.phase/5].n+'.':'';
   if(HARD){const g=hardReward();S.gold+=g;
     msg('Fase difícil vencida!','Você aguentou o sufoco e ganhou '+g+' gold de prêmio, além do gold triplo dos inimigos.'+era2,after);return;}
@@ -871,7 +871,7 @@ function save(){try{localStorage.setItem(SAVE,JSON.stringify(S));}catch(_){}}
 function load(){try{const v=JSON.parse(localStorage.getItem(SAVE));if(!v||!v.attrs)return null;
   if(!v.wv){const up=i=>i>=3?i+1:i;v.owned=(v.owned||[0]).map(up);v.baseWeapon=up(v.baseWeapon||0);v.weapon=up(v.weapon||0);v.wv=2;} // Escopeta entrou no índice 3
   return Object.assign(fresh(),v);}catch(_){return null;}}
-function showHub(){resetPhaseStuff();ensureDaily();save();$('dailyBadge').hidden=!dailyClaimable();$('testBar').hidden=location.hash!=='#teste';$('hubInfo').textContent='Fase '+S.phase+' ('+era().n+') · '+stats().W.n+' · '+S.gold+' gold';
+function showHub(){resetPhaseStuff();ensureDaily();save();$('dailyBadge').hidden=!dailyClaimable();$('testBar').hidden=location.hash!=='#teste';$('hubInfo').textContent='Fase '+S.phase+' ('+era().n+') · '+stats().W.n+' · '+S.gold+' gold · recorde: fase '+(S.best||0);
   $('btnStart').textContent='Jogar fase '+S.phase; $('mStart').hidden=false;}
 $('btnShop').onclick=showAttrs;
 function showArms(){const L=$('armsList');L.innerHTML='';S.owned=S.owned||[0];
