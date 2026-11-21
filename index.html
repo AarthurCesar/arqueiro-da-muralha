@@ -19,6 +19,11 @@ html,body{height:100%;margin:0;overflow:hidden;background:var(--night);color:var
 .bar{height:8px;background:var(--panel);border-radius:4px;overflow:hidden}
 .bar>i{display:block;height:100%;width:0;background:var(--blue);transition:width .15s}
 #bossbar{display:none}#bossbar>i{background:var(--red)}
+.slots{display:flex;align-items:center;gap:5px;align-self:flex-start;background:rgba(20,26,23,.62);border-radius:10px;padding:4px 8px 4px 7px}
+.slotlbl{font-size:11px;font-weight:800;color:var(--muted);margin-right:2px}
+.slot{position:relative;width:24px;height:24px;border-radius:7px;background:rgba(20,26,23,.55);border:1px dashed var(--panel2);display:grid;place-items:center;font:700 11px var(--display);color:#1a1306;box-sizing:border-box}
+.slot.on{background:var(--gold);border:1px solid var(--gold)}
+.slot i{position:absolute;right:-5px;bottom:-5px;min-width:13px;height:13px;border-radius:7px;background:var(--night);color:var(--gold);font:800 9px/13px var(--body);font-style:normal;text-align:center;border:1px solid var(--gold);box-sizing:border-box}
 #btnPause{pointer-events:auto;background:var(--panel2);color:var(--ink);border:1px solid var(--panel2);border-radius:10px;padding:6px 10px;font:800 13px var(--body)}
 #btnAttr{pointer-events:auto;background:var(--gold);color:#241a06;border:0;border-radius:10px;padding:6px 10px;font:800 13px var(--body)}
 .modal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(10,14,12,.78);padding:16px max(16px,env(safe-area-inset-right,0px)) 16px max(16px,env(safe-area-inset-left,0px));z-index:5}
@@ -64,6 +69,7 @@ p{margin:0;color:var(--muted);line-height:1.45}
     <span class="pill gold" id="gold">0 gold</span>
   </div>
   <div class="row"><div class="bar" style="flex:1"><i id="xp"></i></div><span class="pill" id="lvl">Nv 1</span><button id="btnPause" aria-label="Pausar">II</button></div>
+  <div class="slots" id="slots"></div>
   <div class="bar" id="bossbar"><i id="bosshp"></i></div>
 </div>
 <div id="toast"></div>
@@ -72,7 +78,7 @@ p{margin:0;color:var(--muted);line-height:1.45}
   <img id="heroImg" alt="" style="display:block;margin:0 auto -6px;height:150px">
   <h1>Arqueiro da Muralha</h1>
   <p>Arraste o dedo (ou use WASD / setas) para mover o arqueiro em qualquer direção. O arqueiro atira sozinho. Não deixe os monstros chegarem até você.</p>
-  <p>Cada fase começa do zero: nível, cartas e evoluções de arma valem só naquela fase. O que fica para sempre é o que você compra na Loja: atributos e armas. Se perder, o gold volta ao que era no começo da fase.</p>
+  <p>Cada fase começa do zero: nível, cartas e evoluções de arma valem só naquela fase. Você pode ter até 5 cartas por fase; depois disso, subir de nível melhora as que você já tem. O que fica para sempre é o que você compra na Loja: atributos e armas. Se perder, o gold volta ao que era no começo da fase.</p>
   <p id="hubInfo"></p>
   <button class="btn" id="btnStart">Jogar</button>
   <button class="btn ghost" id="btnJourney">Jornada</button>
@@ -85,7 +91,7 @@ p{margin:0;color:var(--muted);line-height:1.45}
 </div></div>
 <div class="modal" id="mCards" hidden><div class="box">
   <h2 id="cardsTitle">Subiu de nível!</h2>
-  <p>Escolha uma carta ou pule para guardar o gold.</p>
+  <p id="cardsSub">Escolha uma carta ou pule para guardar o gold.</p>
   <div id="cardList" style="display:flex;flex-direction:column;gap:8px"></div>
   <button class="btn ghost" id="btnSkip">Pular e guardar gold</button>
 </div></div>
@@ -143,30 +149,44 @@ const $=id=>document.getElementById(id);
 const PZ=2, SPAWNZ=31, HALF=4.6;
 
 // ---------- dados ----------
+// Cartas da fase: até 5 por fase (MAX_SLOTS). Cada carta tem nível máximo (mx); com os 5 espaços cheios, subir de nível só oferece melhorias.
 const CARDS=[
- {id:'dupla',n:'Flecha dupla',t:'Arma',d:'+1 flecha por tiro',p:60,ic:'II'},
- {id:'perf',n:'Flecha perfurante',t:'Arma',d:'Atravessa +2 inimigos',p:70,ic:'→'},
- {id:'fogo',n:'Flecha de fogo',t:'Arma',d:'Queima: 50% do dano por segundo, por 3 s',p:80,ic:'F'},
- {id:'gelo',n:'Flecha de gelo',t:'Arma',d:'Inimigo 40% mais lento',p:80,ic:'G',u:1},
- {id:'raio',n:'Cajado de raio',t:'Arma nova',d:'Raio pula entre 3 inimigos',p:150,ic:'R',u:1},
- {id:'ima',n:'Ímã',t:'Passiva',d:'Puxa bônus de longe',p:50,ic:'Í',u:1},
- {id:'sorte',n:'Sorte',t:'Passiva',d:'+25% de gold e 10% de chance de cada carta sair de graça',p:70,ic:'$'},
- {id:'esc',n:'Escudo',t:'Passiva',d:'Bloqueia 1 toque a cada 30 s',p:90,ic:'E',u:1},
- {id:'chuva',n:'Chuva de flechas',t:'Especial',d:'A cada 15 s, dano na tela toda',p:130,ic:'≡',u:1},
- {id:'rico',n:'Ricochete',t:'Arma',d:'O tiro quica nas paredes até 3 vezes',p:90,ic:'↯'},
- {id:'crit',n:'Golpe crítico',t:'Arma',d:'20% de chance de 3x dano',p:80,ic:'!'},
- {id:'expl',n:'Flecha explosiva',t:'Arma',d:'Cada tiro explode numa área pequena',p:110,ic:'*'},
- {id:'afiada',n:'Ponta afiada',t:'Arma',d:'+30% de dano',p:80,ic:'▲'},
- {id:'rapido',n:'Mão rápida',t:'Arma',d:'+30% de velocidade de tiro',p:80,ic:'»'},
- {id:'gigante',n:'Flecha gigante',t:'Arma',d:'Flechas bem maiores, mais fáceis de acertar',p:70,ic:'⬆'},
- {id:'exec',n:'Execução',t:'Arma',d:'Inimigo (não chefe) com menos de 15% de vida morre na hora',p:100,ic:'✕'},
- {id:'empurra',n:'Flecha de impacto',t:'Arma',d:'Cada acerto empurra o inimigo para trás',p:70,ic:'⇈'},
- {id:'botas',n:'Botas leves',t:'Passiva',d:'+40% de velocidade de movimento',p:50,ic:'B'},
- {id:'estudo',n:'Aprendiz',t:'Passiva',d:'+30% de XP',p:60,ic:'✎'},
- {id:'bonus',n:'Caçador de bônus',t:'Passiva',d:'Bônus aparecem 2x mais vezes',p:60,ic:'◆'},
- {id:'mira',n:'Mira automática',t:'Arma',d:'Seus tiros miram sozinhos no inimigo mais perto',p:120,ic:'◎'},
- {id:'anjo',n:'Anjo da Guarda',t:'Passiva',d:'Se você for derrotado nesta fase, revive uma vez com 3 corações',p:120,ic:'✝'},
+ {id:'dupla',n:'Flecha dupla',t:'Arma',p:60,ic:'II',mx:3,d:L=>'+'+L+(L>1?' flechas':' flecha')+' por tiro'},
+ {id:'perf',n:'Flecha perfurante',t:'Arma',p:70,ic:'→',mx:3,d:L=>'Atravessa +'+2*L+' inimigos'},
+ {id:'fogo',n:'Flecha de fogo',t:'Arma',p:80,ic:'F',mx:3,d:L=>'Queima: '+50*L+'% do dano por segundo, por 3 s'},
+ {id:'gelo',n:'Flecha de gelo',t:'Arma',p:80,ic:'G',mx:3,d:L=>'Inimigo '+(30+10*L)+'% mais lento'},
+ {id:'raio',n:'Cajado de raio',t:'Arma nova',p:150,ic:'R',mx:3,d:L=>'Raio pula entre '+(2+L)+' inimigos'},
+ {id:'ima',n:'Ímã',t:'Passiva',p:50,ic:'Í',mx:1,d:L=>'Puxa bônus de longe'},
+ {id:'sorte',n:'Sorte',t:'Passiva',p:70,ic:'$',mx:3,d:L=>'+'+25*L+'% de gold e '+10*L+'% de chance de cada carta sair de graça'},
+ {id:'esc',n:'Escudo',t:'Defesa',p:90,ic:'E',mx:3,d:L=>'Bloqueia 1 toque a cada '+ESC_CD[L]+' s'},
+ {id:'chuva',n:'Chuva de flechas',t:'Especial',p:130,ic:'≡',mx:3,d:L=>'A cada '+RAIN_CD[L]+' s, dano na tela toda'},
+ {id:'rico',n:'Ricochete',t:'Arma',p:90,ic:'↯',mx:3,d:L=>'O tiro quica nas paredes até '+(1+2*L)+' vezes'},
+ {id:'crit',n:'Golpe crítico',t:'Arma',p:80,ic:'!',mx:3,d:L=>(10+10*L)+'% de chance de 3x dano'},
+ {id:'expl',n:'Flecha explosiva',t:'Arma',p:110,ic:'*',mx:3,d:L=>'Cada tiro explode numa área '+['','pequena','média','grande'][L]},
+ {id:'afiada',n:'Ponta afiada',t:'Arma',p:80,ic:'▲',mx:3,d:L=>'+'+30*L+'% de dano'},
+ {id:'rapido',n:'Mão rápida',t:'Arma',p:80,ic:'»',mx:3,d:L=>'+'+30*L+'% de velocidade de tiro'},
+ {id:'gigante',n:'Flecha gigante',t:'Arma',p:70,ic:'⬆',mx:2,d:L=>L>1?'Flechas enormes, quase impossível errar':'Flechas bem maiores, mais fáceis de acertar'},
+ {id:'exec',n:'Execução',t:'Arma',p:100,ic:'✕',mx:3,d:L=>'Inimigo (não chefe) com menos de '+(10+5*L)+'% de vida morre na hora'},
+ {id:'empurra',n:'Flecha de impacto',t:'Arma',p:70,ic:'⇈',mx:3,d:L=>'Cada acerto empurra o inimigo para trás'+(L>2?', muito mais forte':L>1?', mais forte':'')},
+ {id:'botas',n:'Botas leves',t:'Passiva',p:50,ic:'B',mx:2,d:L=>'+'+(L>1?70:40)+'% de velocidade de movimento'},
+ {id:'estudo',n:'Aprendiz',t:'Passiva',p:60,ic:'✎',mx:3,d:L=>'+'+30*L+'% de XP'},
+ {id:'bonus',n:'Caçador de bônus',t:'Passiva',p:60,ic:'◆',mx:2,d:L=>'Bônus aparecem '+(L+1)+'x mais vezes'},
+ {id:'mira',n:'Mira automática',t:'Arma',p:120,ic:'◎',mx:1,d:L=>'Seus tiros miram sozinhos no inimigo mais perto'},
+ {id:'anjo',n:'Anjo da Guarda',t:'Defesa',p:120,ic:'✝',mx:1,d:L=>'Se você for derrotado nesta fase, revive uma vez com a vida cheia'},
+ // Novas (2026-11-21): 5 de defesa, 4 de ataque, 1 de economia
+ {id:'coracao',n:'Coração extra',t:'Defesa',p:100,ic:'♥',mx:2,d:L=>(L>1?'+2 corações':'+1 coração')+' de vida máxima (o novo já vem cheio)'},
+ {id:'muralha',n:'Muralha reforçada',t:'Defesa',p:90,ic:'▦',mx:2,d:L=>L>1?'Em cada onda, os 2 primeiros inimigos que passarem não tiram coração (menos o chefe)':'Em cada onda, o 1º inimigo que passar não tira coração (menos o chefe)'},
+ {id:'erva',n:'Erva curativa',t:'Defesa',p:90,ic:'+',mx:3,d:L=>'Recupera 1 coração a cada '+HEAL_CD[L]+' s'},
+ {id:'estacas',n:'Estacas na muralha',t:'Defesa',p:80,ic:'∧∧',mx:3,d:L=>'Inimigos perto da muralha ficam '+STAKE[L]+'% mais lentos'},
+ {id:'gelado',n:'Coração de gelo',t:'Defesa',p:90,ic:'❄',mx:3,d:L=>'Quando você perde um coração, todos os inimigos congelam por '+(1+L)+' s'},
+ {id:'lateral',n:'Flechas laterais',t:'Arma',p:90,ic:'Ψ',mx:2,d:L=>'+'+2*L+' flechas em diagonal'},
+ {id:'gigantes',n:'Caçador de gigantes',t:'Arma',p:90,ic:'♛',mx:3,d:L=>'+'+40*L+'% de dano em chefes e inimigos grandes'},
+ {id:'furia',n:'Fúria',t:'Arma',p:80,ic:'✹',mx:3,d:L=>'Com 1 coração: +'+(25+25*L)+'% de dano e de velocidade de tiro'},
+ {id:'certeiro',n:'Tiro certeiro',t:'Arma',p:90,ic:'⊕',mx:3,d:L=>'A cada '+(6-L)+' tiros, 1 tiro com 4x de dano'},
+ {id:'pechincha',n:'Pechincha',t:'Passiva',p:60,ic:'%',mx:2,d:L=>'Cartas e melhorias custam '+(L>1?50:30)+'% menos'},
 ];
+const MAX_SLOTS=5, ESC_CD=[0,30,22,15], RAIN_CD=[0,15,12,9], HEAL_CD=[0,40,30,20], STAKE=[0,40,55,70];
+const CARD_BY={}; CARDS.forEach(c=>CARD_BY[c.id]=c);
 const ATTRS=[
  {id:'dmg',n:'Dano',d:'+10% de dano'},
  {id:'atk',n:'Velocidade de ataque',d:'+8% de tiros'},
@@ -220,10 +240,12 @@ const clone=o=>JSON.parse(JSON.stringify(o));
 // Permanente: fase, gold, atributos e arma comprada na Loja. Temporário (só dentro da fase): XP, nível, cartas e evoluções de arma.
 function resetPhaseStuff(){S.lvl=1;S.xp=0;S.cards={};S.weapon=S.baseWeapon||0;}
 function stats(){
-  const a=S.attrs,c=S.cards,W=WEAPONS[S.weapon||0];
-  return {W, dmg:(1+.1*a.dmg)*W.dmg*(c.afiada?1.3:1), rate:1.6*(1+.08*a.atk)*W.rate*(c.rapido?1.3:1), mov:9*(1+.06*a.mov)*(c.botas?1.4:1),
-    maxH:3, xpm:(1+.1*a.xp)*(c.estudo?1.3:1), big:!!c.gigante, mira:!!c.mira, exec:!!c.exec, push:!!c.empurra, bonus:!!c.bonus, shots:1+(c.dupla||0), pierce:2*(c.perf||0)+(W.pierce||0), fogo:c.fogo||0,
-    gelo:!!c.gelo, raio:!!c.raio, ajud:!!(S.helper&&S.helperOn), cav:!!c.cav, ima:!!c.ima, goldm:1+.25*(c.sorte||0), esc:!!c.esc, chuva:!!c.chuva, rico:c.rico?3:0, crit:!!c.crit, expl:!!c.expl, vamp:!!c.vamp};
+  const a=S.attrs,c=S.cards,W=WEAPONS[S.weapon||0],L=id=>c[id]||0;
+  const fury=L('furia')&&run&&run.hp===1?1.25+.25*L('furia'):1; // Fúria: só com 1 coração
+  return {W, dmg:(1+.1*a.dmg)*W.dmg*(1+.3*L('afiada'))*fury, rate:1.6*(1+.08*a.atk)*W.rate*(1+.3*L('rapido'))*fury, mov:9*(1+.06*a.mov)*(1+[0,.4,.7][L('botas')]),
+    maxH:3+L('coracao'), xpm:(1+.1*a.xp)*(1+.3*L('estudo')), big:L('gigante'), mira:!!c.mira, exec:L('exec'), push:L('empurra'), bonus:L('bonus'), shots:1+L('dupla'), pierce:2*L('perf')+(W.pierce||0), fogo:L('fogo'),
+    gelo:L('gelo'), raio:L('raio'), ajud:!!(S.helper&&S.helperOn), cav:!!c.cav, ima:!!c.ima, goldm:1+.25*L('sorte'), esc:L('esc'), chuva:L('chuva'), rico:L('rico')?1+2*L('rico'):0, crit:L('crit'), expl:L('expl'), vamp:!!c.vamp,
+    muralha:L('muralha'), erva:L('erva'), estacas:L('estacas'), gelado:L('gelado'), lateral:L('lateral'), gigantes:L('gigantes'), certeiro:L('certeiro'), fury:fury>1};
 }
 const xpNeed=l=>Math.round(10*Math.pow(1.2,l-1));
 const ATTR_MAX=100; // nível máximo de cada atributo
@@ -232,6 +254,11 @@ const attrCost=n=>n<=4?5*2**n:Math.round(80*1.07**(n-4));
 // Curva de dificuldade (fases avançadas): vida x1,15 por fase, velocidade até 1,8x, gold e preço das cartas +10% por fase.
 const phaseGold=()=>1+.1*(S.phase-1);
 const cardCost=c=>Math.round(c.p*.4*phaseGold());
+const cardLv=id=>(S.cards&&S.cards[id])||0;
+const ownedCards=()=>Object.keys(S.cards||{}).filter(k=>S.cards[k]>0&&CARD_BY[k]).map(k=>CARD_BY[k]); // na ordem em que foram pegas
+const slotsUsed=()=>ownedCards().length;
+const cDesc=(c,L)=>typeof c.d==='function'?c.d(L):c.d;
+const cardDisc=()=>[1,.7,.5][cardLv('pechincha')]; // Pechincha
 
 // ---------- three ----------
 const renderer=new THREE.WebGLRenderer({canvas:$('c'),antialias:true});
@@ -249,6 +276,12 @@ lane.rotation.x=-Math.PI/2; lane.position.set(0,.01,17); scene.add(lane);
 const wall=new THREE.Mesh(new THREE.BoxGeometry(HALF*2+3,1.6,1),new THREE.MeshLambertMaterial({color:0x8b8574}));
 wall.position.set(0,.8,PZ-1.3); scene.add(wall);
 for(let i=-5;i<=5;i+=2){const m=new THREE.Mesh(new THREE.BoxGeometry(.9,.7,1),wall.material);m.position.set(i,1.95,PZ-1.3);scene.add(m);}
+// Estacas na muralha (carta): faixa perto da muralha onde os inimigos andam mais devagar
+const stakeTex=canvasTex(384,256,(x,w,h)=>{const g=x.createLinearGradient(0,0,0,h);g.addColorStop(0,'rgba(160,110,55,.12)');g.addColorStop(1,'rgba(160,110,55,.30)');x.fillStyle=g;x.fillRect(0,26,w,h-26);
+  x.lineWidth=3;x.strokeStyle='#1c120c';x.lineJoin='round';
+  for(let i=0;i<16;i++){const cx=12+i*24;x.fillStyle='#8a5a2b';x.beginPath();x.moveTo(cx-8,44);x.lineTo(cx,6);x.lineTo(cx+8,44);x.closePath();x.fill();x.stroke();
+    x.fillStyle='#e8cf9a';x.beginPath();x.moveTo(cx-3,19);x.lineTo(cx,9);x.lineTo(cx+3,19);x.closePath();x.fill();}});
+const stakeM=new THREE.Sprite(new THREE.SpriteMaterial({map:stakeTex,transparent:true,depthWrite:false}));stakeM.scale.set(HALF*2+1.4,7,1);stakeM.position.set(0,.05,PZ+3.5);stakeM.visible=false;scene.add(stakeM);
 // árvores decorativas
 // ---------- desenhos 2D (contorno escuro, como na arte) ----------
 function canvasTex(w,h,draw){const c=document.createElement('canvas');c.width=w;c.height=h;draw(c.getContext('2d'),w,h);const t=new THREE.CanvasTexture(c);return t;}
@@ -411,14 +444,14 @@ function isHardPhase(p){const k=Math.floor((p-1)/5);if(!S.seed)S.seed=1+(Math.ra
   return p===5*k+lo+Math.floor(h*(6-lo));}
 function hardReward(){return Math.round(120*S.phase*stats().goldm);}
 function startPhase(keep){
-  HARD=isHardPhase(S.phase);
+  HARD=isHardPhase(S.phase); stakeM.visible=false;
   const pend=keep&&run?run.pendingLv:0;
   clearWorld();
   resetPhaseStuff();
   snap=clone(S);
   const st=stats();
   run={t:0,wave:1,toSpawn:waveCount(1),spawnT:0,waveGap:0,boss:null,bossSpawned:false,en:[],ar:[],bo:[],fx:[],
-    hp:st.maxH,fireT:0,helpT:0,babyT:1,twinT:1.6,bonT:5,rainT:15,shieldT:0,shield:st.esc,triple:0,slowAll:0,pendingLv:pend,done:false};
+    hp:st.maxH,fireT:0,helpT:0,babyT:1,twinT:1.6,bonT:5,rainT:15,shieldT:0,shield:!!st.esc,triple:0,slowAll:0,pendingLv:pend,done:false};
   player.position.x=0; player.position.z=PZ; targetX=0; targetZ=PZ;
   ground.material.color.setHex(era().ground); lane.material.color.setHex(era().lane);
   if(HARD){const red=new THREE.Color(1,.68,.62);ground.material.color.multiply(red);lane.material.color.multiply(red);}
@@ -467,17 +500,20 @@ function spawn(type,x,z){
 function nearest(x,z){let b=null,bd=1e9;for(const e of run.en){const d=(e.m.position.x-x)**2+(e.m.position.z-z)**2;if(d<bd){bd=d;b=e;}}return b;}
 const wMats={};
 // half=true: tiro do Ajudante (tudo pela metade)
-function shoot(from,dmg,count,gold,half){
-  const st=stats(),W=st.W,mat=gold?arrowGoldMat:(wMats[W.col]||(wMats[W.col]=new THREE.MeshBasicMaterial({color:W.col})));
+function shoot(from,dmg,count,gold,half,power){
+  const st=stats(),W=st.W,mat=gold||power?arrowGoldMat:(wMats[W.col]||(wMats[W.col]=new THREE.MeshBasicMaterial({color:W.col})));
   // Sem a carta Mira automática, o tiro sai reto para cima.
   let ang=0; const tgt=st.mira?nearest(from.x,from.z):null;
   if(tgt){ang=Math.atan2(tgt.m.position.x-from.x,tgt.m.position.z-from.z);}
   // Escopeta: cada tiro vira vários chumbos bem espalhados.
   const sp=W.spread||.14; if(W.pellets)count=count+W.pellets-1;
-  for(let i=0;i<count;i++){const a=ang+(i-(count-1)/2)*sp+(W.pellets?(Math.random()-.5)*.08:0);
-    const m=new THREE.Mesh(arrowGeo,mat); {const g=st.big?1.8:1;m.scale.set(W.size*1.4*g,W.size*1.4*g,W.size*g);} m.position.set(from.x,1,from.z+.5); m.rotation.y=a; m.add(new THREE.Mesh(trailGeo,trailMat(gold?0xffc94a:W.col))); scene.add(m);
+  const angs=[]; for(let i=0;i<count;i++)angs.push(ang+(i-(count-1)/2)*sp+(W.pellets?(Math.random()-.5)*.08:0));
+  // Flechas laterais: +2 em diagonal por nível (só o arqueiro)
+  if(st.lateral&&!half){const o=[.5,.9];for(let k=0;k<st.lateral;k++)angs.push(ang-o[k],ang+o[k]);}
+  angs.forEach((a,i)=>{
+    const m=new THREE.Mesh(arrowGeo,mat); {const g=(st.big?1+.8*st.big:1)*(power?1.5:1);m.scale.set(W.size*1.4*g,W.size*1.4*g,W.size*g);} m.position.set(from.x,1,from.z+.5); m.rotation.y=a; m.add(new THREE.Mesh(trailGeo,trailMat(gold||power?0xffc94a:W.col))); scene.add(m);
     if(i===0)sfx('shot');
-    run.ar.push({m,vx:Math.sin(a)*W.speed,vz:Math.cos(a)*W.speed,dmg,pierce:half?Math.floor(st.pierce/2):st.pierce,boom:W.boom||(st.expl?1.2:0),bounce:half?Math.floor(st.rico/2):st.rico,half:!!half,big:st.big,home:!!W.home,hit:new Set()});}
+    run.ar.push({m,vx:Math.sin(a)*W.speed,vz:Math.cos(a)*W.speed,dmg,pierce:half?Math.floor(st.pierce/2):st.pierce,boom:W.boom||(st.expl?.8+.4*st.expl:0),bounce:half?Math.floor(st.rico/2):st.rico,half:!!half,big:st.big,home:!!W.home,hit:new Set()});});
 }
 function hurt(e,d){e.hp-=d; tint(e,0xff9090); e.flash=.08; e.hitT=.15;}
 function kill(e){
@@ -495,23 +531,26 @@ function lightning(a,b){const g=new THREE.BufferGeometry().setFromPoints([a.clon
   const l=new THREE.Line(g,new THREE.LineBasicMaterial({color:0x9fd8ff})); scene.add(l); run.fx.push({m:l,life:.15});}
 function hitEnemy(e,ar){
   const st=stats(); let d=ar.dmg,crit=false;
-  if(st.crit&&!ar.fixed&&Math.random()<(ar.half?.1:.2)){d*=3;crit=true;}
+  if(st.gigantes&&!ar.fixed&&(e.T.boss||e.type==='golem'))d*=1+.4*st.gigantes; // Caçador de gigantes
+  if(st.crit&&!ar.fixed&&Math.random()<(.1+.1*st.crit)*(ar.half?.5:1)){d*=3;crit=true;}
   hurt(e,d); if(crit)tint(e,0xffff66); dmgNum(e.m.position,d,crit); burst(e.m.position,crit?0xffee66:0xffffff,crit?4:2,4,.45);
   if(ar.boom){for(const o of run.en){if(o!==e&&o.m.position.distanceTo(e.m.position)<ar.boom)hurt(o,ar.dmg*.6);}
     const b=new THREE.Mesh(new THREE.SphereGeometry(ar.boom,14,10),new THREE.MeshBasicMaterial({color:ar.fixed?0xff7ad9:0xff9a40,transparent:true,opacity:.45}));
     b.position.copy(e.m.position);scene.add(b);run.fx.push({m:b,life:.18});shake(.15);}
   if(ar.fixed)return;
-  if(st.exec&&!e.T.boss&&e.hp>0&&e.hp<e.max*.15)e.hp=0;
-  if(st.push)e.m.position.z=Math.min(SPAWNZ,e.m.position.z+(e.T.boss?.12:(ar.half?.3:.6)));
+  if(st.exec&&!e.T.boss&&e.hp>0&&e.hp<e.max*(.1+.05*st.exec))e.hp=0;
+  if(st.push)e.m.position.z=Math.min(SPAWNZ,e.m.position.z+(e.T.boss?.12:(ar.half?.3:.6))*(1+(st.push-1)/3));
   // glitter do bebê: dano fixo, sem cartas nem atributos
   if(st.fogo||st.W.burn){e.burn=3;e.burnD=.5*st.dmg*Math.max(st.fogo,st.W.burn?1:0)*(ar.half?.5:1);}
   if(st.W.chain){let n=0;const mx=ar.half?2:st.W.chain;for(const o of run.en){if(o===e||n>=mx)continue;if(o.m.position.distanceTo(e.m.position)<5){hurt(o,ar.dmg*.5);lightning(e.m.position,o.m.position);n++;}}}
-  if(st.gelo){e.slow=2;e.slowF=ar.half?.8:.6;}
-  if(st.raio){let n=0;const mx=ar.half?1:3;for(const o of run.en){if(o===e||n>=mx)continue;if(o.m.position.distanceTo(e.m.position)<4.5){hurt(o,ar.dmg*.6);lightning(e.m.position,o.m.position);n++;}}}
+  if(st.gelo){const f=.3+.1*st.gelo;e.slow=2;e.slowF=1-(ar.half?f/2:f);}
+  if(st.raio){let n=0;const mx=ar.half?1:2+st.raio;for(const o of run.en){if(o===e||n>=mx)continue;if(o.m.position.distanceTo(e.m.position)<4.5){hurt(o,ar.dmg*.6);lightning(e.m.position,o.m.position);n++;}}}
 }
 function loseHeart(){
-  if(run.shield){run.shield=false;run.shieldT=30;toast('Escudo bloqueou!');{const p=player.position.clone();ringFx(p,0x9fdcff,3.4,7,.35);burst(p,0xbfe8ff,12,6,.6);shake(.4);}return;}
+  if(run.shield){run.shield=false;run.shieldT=ESC_CD[stats().esc]||30;toast('Escudo bloqueou!');{const p=player.position.clone();ringFx(p,0x9fdcff,3.4,7,.35);burst(p,0xbfe8ff,12,6,.6);shake(.4);}return;}
   run.hp--; run.hurt=1; flash(0xe2574c); sfx('hurt'); archerHurt(player); shake(.9); bump($('hearts'));
+  {const st=stats();if(run.hp>0&&st.gelado){run.freeze=1+st.gelado;toast('Coração de gelo: inimigos congelados!');ringFx(player.position.clone(),0xa8e4ff,1,9,.45);}
+   else if(run.hp===1&&st.fury)toast('Fúria! Mais dano e mais velocidade');}
   if(run.hp<=0&&revive())return;
   if(run.hp<=0){run.done=true; const k=Math.floor((run.earned||0)/2);
     msg('Você foi alcançado!','Você volta ao menu e fica com metade do gold que ganhou nesta fase: +'+k+' gold.',()=>{keepHalf();carry=false;$('mCards').hidden=true;showHub();});}
@@ -734,19 +773,24 @@ function step(dt){
   if(!run.bossSpawned){
     if(run.toSpawn>0){run.spawnT-=dt;if(run.spawnT<=0){spawn(pickType());run.toSpawn--;run.spawnT=waveInterval();}}
     else if(run.en.length===0||(run.waveGap+=dt)>5){
-      run.waveGap=0; if(run.wave<(HARD?HARD_WAVES:5)){run.wave++;run.toSpawn=waveCount(run.wave);toast('Onda '+run.wave);}
-      else if(run.en.length===0){run.bossSpawned=true;spawn('ogro',0);banner('CHEFE!');toast(era().ogro.n);sfx('boss');shake(.7);}
+      run.waveGap=0; if(run.wave<(HARD?HARD_WAVES:5)){run.wave++;run.toSpawn=waveCount(run.wave);run.wallUsed=0;toast('Onda '+run.wave);}
+      else if(run.en.length===0){run.bossSpawned=true;run.wallUsed=0;spawn('ogro',0);banner('CHEFE!');toast(era().ogro.n);sfx('boss');shake(.7);}
     }
   }
   // tiros
-  if(run.en.length){run.fireT-=dt;if(run.fireT<=0){run.fireT=1/st.rate;shoot(player.position,st.dmg,st.shots+(run.triple>0?2:0),run.triple>0);archerShoot(player);}
+  if(run.en.length){run.fireT-=dt;if(run.fireT<=0){run.fireT=1/st.rate;let pw=false;if(st.certeiro){run.shotN=(run.shotN||0)+1;if(run.shotN>=6-st.certeiro){run.shotN=0;pw=true;}}shoot(player.position,st.dmg*(pw?4:1),st.shots+(run.triple>0?2:0),run.triple>0,false,pw);archerShoot(player);}
     if(helper){run.helpT-=dt;if(run.helpT<=0){run.helpT=1/st.rate;shoot(helper.position,st.dmg*.5,Math.max(1,Math.floor((st.shots+(run.triple>0?2:0))/2)),run.triple>0,true);archerShoot(helper);}}
     if(baby){run.babyT-=dt;if(run.babyT<=0){run.babyT=BABY.every;throwGlitter(baby.position,BABY);}}
     if(twin){run.twinT-=dt;if(run.twinT<=0){run.twinT=TWIN.every;throwGlitter(twin.position,TWIN);}}}
   run.triple=Math.max(0,run.triple-dt); run.slowAll=Math.max(0,run.slowAll-dt);
   if(st.esc&&!run.shield){run.shieldT-=dt;if(run.shieldT<=0)run.shield=true;}
-  if(run.shield&&!shieldMesh.visible){const p=player.position.clone();ringFx(p,0x9fdcff,5,3.4,.3);} shieldMesh.visible=run.shield; animShield(dt,run.t);
-  if(st.chuva){run.rainT-=dt;if(run.rainT<=0){run.rainT=15;flash(0xe8b14a);for(const e of [...run.en])hurt(e,st.dmg*2);toast('Chuva de flechas!');}}
+  if(run.shield&&!shieldMesh.visible){const p=player.position.clone();ringFx(p,0x9fdcff,5,3.4,.3);} shieldMesh.visible=!!run.shield; animShield(dt,run.t);
+  if(st.chuva){run.rainT-=dt;if(run.rainT<=0){run.rainT=RAIN_CD[st.chuva]||15;flash(0xe8b14a);for(const e of [...run.en])hurt(e,st.dmg*2);toast('Chuva de flechas!');}}
+  // Erva curativa: sem vida cheia, recupera 1 coração a cada X s
+  if(st.erva){const cd=HEAL_CD[st.erva];if(run.hp<st.maxH){run.healT=(run.healT??cd)-dt;if(run.healT<=0){run.healT=cd;run.hp++;toast('Erva curativa: +1 coração');ringFx(player.position.clone(),0x7dffa0,1,3.4,.4);sfx('bonus');bump($('hearts'));}}else run.healT=cd;}
+  // Coração de gelo: inimigos parados por alguns segundos
+  const fz0=run.freeze>0; run.freeze=Math.max(0,(run.freeze||0)-dt); const unf=fz0&&!(run.freeze>0);
+  stakeM.visible=!!st.estacas;
   // flechas
   for(const a of [...run.ar]){
     if(a.home){const t=nearest(a.m.position.x,a.m.position.z);if(t){const sp=Math.hypot(a.vx,a.vz),dx=t.m.position.x-a.m.position.x,dz=t.m.position.z-a.m.position.z,d=Math.hypot(dx,dz)||1,k=Math.min(1,dt*5);
@@ -760,7 +804,7 @@ function step(dt){
       if(b){a.bounce--;a.hit.clear();a.m.rotation.y=Math.atan2(a.vx,a.vz);}}
     if(a.m.position.z>SPAWNZ+3||a.m.position.z<-2||Math.abs(a.m.position.x)>HALF+3){scene.remove(a.m);run.ar.splice(run.ar.indexOf(a),1);continue;}
     for(const e of run.en){if(a.hit.has(e))continue;const p=e.m.position;
-      if((p.x-a.m.position.x)**2+(p.z-a.m.position.z)**2<(e.r+(a.big?.75:.3))**2){a.hit.add(e);hitEnemy(e,a);
+      if((p.x-a.m.position.x)**2+(p.z-a.m.position.z)**2<(e.r+.3+.45*(a.big||0))**2){a.hit.add(e);hitEnemy(e,a);
         if(a.pierce--<=0){scene.remove(a.m);run.ar.splice(run.ar.indexOf(a),1);break;}}}}
   // inimigos
   for(const e of [...run.en]){
@@ -768,9 +812,11 @@ function step(dt){
       if(!(e.flash>0))tint(e,e.burn>0?0xffa860:0xffffff);}
     if(e.slow>0)e.slow-=dt;
     if(e.flash>0){e.flash-=dt;if(e.flash<=0)tint(e,e.burn>0?0xffa860:0xffffff);}
+    if(!(e.flash>0)){if(run.freeze>0)tint(e,0xa8e4ff);else if(unf)tint(e,e.burn>0?0xffa860:0xffffff);}
     if(e.hp<=0){kill(e);if(run.done)return;continue;}
-    let sp=e.sp*(e.slow>0?(e.slowF||.6):1)*(run.slowAll>0?.5:1);
+    let sp=e.sp*(e.slow>0?(e.slowF||.6):1)*(run.slowAll>0?.5:1)*(run.freeze>0?0:1);
     const p=e.m.position;
+    if(st.estacas&&p.z<PZ+7)sp*=1-STAKE[st.estacas]/100; // Estacas na muralha
     if(knight&&Math.abs(p.x-knight.position.x)<1.1+e.r&&Math.abs(p.z-knight.position.z)<.6+e.r){sp=0;e.hp-=st.dmg*dt;}
     p.z-=sp*dt;
     // animação: balanço ao andar, amassa quando leva tiro, chefe cresce ao entrar
@@ -778,12 +824,14 @@ function step(dt){
     {const g=e.grow<1?Math.max(.05,backOut(e.grow)):1,b=e.T.fly?Math.sin(e.wp*1.7)*.08:Math.abs(Math.sin(e.wp))*.07,h=e.hitT>0?e.hitT/.15:0,z=e.s*g;
      e.m.material.rotation=e.T.fly?Math.sin(e.wp*.8)*.12:Math.sin(e.wp)*.1; e.m.scale.set(z*(1-b*.6+h*.25),z*(1+b-h*.2),1);}
     if(e.T.fly)p.x=Math.max(-HALF,Math.min(HALF,e.x0+Math.sin(run.t*3+e.ph)*1.6));
-    if(e.T.boss){e.sumT-=dt;if(e.sumT<=0){e.sumT=HARD?3:5;spawn('goblin',p.x-1.5,p.z+1);spawn('goblin',p.x+1.5,p.z+1);}}
+    if(e.T.boss&&!(run.freeze>0)){e.sumT-=dt;if(e.sumT<=0){e.sumT=HARD?3:5;spawn('goblin',p.x-1.5,p.z+1);spawn('goblin',p.x+1.5,p.z+1);}}
     if(p.z<=PZ+e.r||(Math.abs(p.x-player.position.x)<e.r+.6&&Math.abs(p.z-PPZ)<e.r+.6)){scene.remove(e.m);run.en.splice(run.en.indexOf(e),1);
-      if(e.T.boss){run.boss=null;run.bossHp=e.hp;run.hp=1;run.shield=false;} loseHeart(); if(run.done)return;}
+      if(e.T.boss){run.boss=null;run.bossHp=e.hp;run.hp=1;run.shield=false;}
+      else if(st.muralha&&(run.wallUsed||0)<st.muralha){run.wallUsed=(run.wallUsed||0)+1;toast('Muralha reforçada segurou!');burst(p,0xd9c3a0,10,5,.7);ringFx(p.clone(),0xd9c3a0,.8,3,.3);shake(.3);continue;}
+      loseHeart(); if(run.done)return;}
   }
   // bônus
-  run.bonT-=dt; if(run.bonT<=0){run.bonT=(6+Math.random()*4)/(st.bonus?2:1);const k=Object.keys(BON)[Math.random()*4|0];
+  run.bonT-=dt; if(run.bonT<=0){run.bonT=(6+Math.random()*4)/(1+st.bonus);const k=Object.keys(BON)[Math.random()*4|0];
     const m=mkSprite(bonusTex(k),1.7,1.7,1.3);
     m.position.set((Math.random()*2-1)*HALF,.9,SPAWNZ);scene.add(m);run.bo.push({m,k});}
   for(const b of [...run.bo]){const p=b.m.position;p.z-=3*dt;{const k=1+.08*Math.sin(run.t*6+p.x);b.m.scale.set(1.7*k,1.7*k,1);}
@@ -807,24 +855,42 @@ function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;
 let fl=null;
 function flash(c){scene.background.setHex(c);clearTimeout(fl);fl=setTimeout(()=>scene.background.setHex(0x141a17),90);}
 let tt=null; function toast(t){const el=$('toast');el.textContent=t;el.style.opacity=1;clearTimeout(tt);tt=setTimeout(()=>el.style.opacity=0,1100);}
-function hud(){const st=stats();
+let slotKey='';
+function drawSlots(){const own=ownedCards(),k=own.map(c=>c.id+S.cards[c.id]).join();if(k===slotKey)return;slotKey=k;
+  let h='<span class="slotlbl">Cartas</span>';for(let i=0;i<MAX_SLOTS;i++){const c=own[i],l=c&&S.cards[c.id];h+=c?`<span class="slot on" title="${c.n}">${c.ic}${l>1?`<i>${l}</i>`:''}</span>`:'<span class="slot"></span>';}
+  $('slots').innerHTML=h;}
+function hud(){const st=stats();drawSlots();
   $('hearts').textContent='♥'.repeat(Math.max(0,run.hp))+'♡'.repeat(Math.max(0,st.maxH-run.hp));
   $('phase').textContent=run.bossSpawned?'Fase '+S.phase+(HARD?' 🔥':'')+' · Chefe':'Fase '+S.phase+(HARD?' 🔥':'')+' · Onda '+run.wave+'/'+(HARD?HARD_WAVES:5);
   $('gold').textContent=S.gold+' gold'; $('lvl').textContent='Nv '+S.lvl+' · '+st.W.n;
   $('xp').style.width=(100*S.xp/xpNeed(S.lvl))+'%';
   $('bossbar').style.display=run.boss?'block':'none'; if(run.boss)$('bosshp').style.width=(100*run.boss.hp/run.boss.max)+'%';}
 function showCards(){
-  const avail=CARDS.filter(c=>!S.cards[c.id]); const pick=[]; // carta que você já tem não aparece de novo
+  const used=slotsUsed(),full=used>=MAX_SLOTS,disc=cardDisc();
+  // Até 5 cartas por fase. Com os 5 espaços cheios, só aparecem melhorias das cartas que você já tem.
+  const pool=CARDS.filter(c=>{const l=cardLv(c.id);return l?l<c.mx:!full;});
+  const pick=[];
   const NW=WEAPONS[(S.weapon||0)+1];
   if(NW&&S.phase>=NW.ph)pick.push({id:'_arma',n:'Evoluir: '+NW.n,t:'Evolução de arma',d:NW.d,p:NW.p,ic:'★'});
-  while(pick.length<3&&avail.length)pick.push(avail.splice(Math.random()*avail.length|0,1)[0]);
-  if(!pick.length){run.pendingLv=0;toast('Você já tem todas as cartas!');return;}
+  while(pick.length<3&&pool.length)pick.push(pool.splice(Math.random()*pool.length|0,1)[0]);
+  if(!pick.length){const g=Math.round(40*phaseGold()); // tudo no nível máximo: prêmio simples
+    if(run.hp<stats().maxH)pick.push({id:'_cura',n:'Poção',t:'Prêmio',d:'Recupera 1 coração',ic:'+'});
+    pick.push({id:'_ouro',n:'Bolsa de gold',t:'Prêmio',d:'+'+g+' gold',ic:'$',g});}
   const newLv=S.lvl-run.pendingLv+1, free=newLv===2;
   $('cardsTitle').textContent='Subiu para o nível '+newLv+'!'+(free?' Carta grátis':'');
+  $('cardsSub').textContent=full?'Suas 5 cartas já estão escolhidas. Agora cada nível melhora uma delas.':'Você pode ter até 5 cartas nesta fase (tem '+used+'). Escolha uma ou pule para guardar o gold.';
   const L=$('cardList');L.innerHTML='';
-  for(const c of pick){const luck=!free&&S.cards.sorte&&Math.random()<.1,cost=free||luck?0:cardCost(c),ok=S.gold>=cost,b=document.createElement('button');b.className='card'+(ok?'':' off');
-    b.innerHTML=`<span class="ic">${c.ic}</span><span class="tx"><span class="tag">${c.t}</span><b>${c.n}</b><small>${c.d}</small></span><span class="pr">${cost?cost+' gold':(luck?'Grátis (Sorte)':'Grátis')}</span>`;
-    b.onclick=()=>{if(!ok){toast('Gold insuficiente');return;}S.gold-=cost;if(c.id==='_arma'){S.weapon=(S.weapon||0)+1;toast('Nova arma: '+WEAPONS[S.weapon].n);}else S.cards[c.id]=(S.cards[c.id]||0)+1;dailyAdd('cards');syncUnits();nextCard();};L.appendChild(b);}
+  for(const c of pick){const prize=c.t==='Prêmio',arma=c.id==='_arma',lv=prize||arma?0:cardLv(c.id)+1;
+    const luck=!free&&!prize&&cardLv('sorte')&&Math.random()<.1*cardLv('sorte');
+    const cost=free||luck||prize?0:Math.round(cardCost(c)*(lv>1?1+.5*(lv-1):1)*disc),ok=S.gold>=cost,b=document.createElement('button');b.className='card'+(ok?'':' off');
+    const tag=prize||arma?c.t:lv>1?'Melhoria · Nv '+lv+' de '+c.mx:c.t+' · Carta nova';
+    b.innerHTML=`<span class="ic">${c.ic}</span><span class="tx"><span class="tag">${tag}</span><b>${c.n}</b><small>${cDesc(c,lv)}</small></span><span class="pr">${cost?cost+' gold':(luck?'Grátis (Sorte)':'Grátis')}</span>`;
+    b.onclick=()=>{if(!ok){toast('Gold insuficiente');return;}S.gold-=cost;
+      if(arma){S.weapon=(S.weapon||0)+1;toast('Nova arma: '+WEAPONS[S.weapon].n);}
+      else if(c.id==='_cura'){run.hp=Math.min(stats().maxH,run.hp+1);toast('+1 coração');}
+      else if(c.id==='_ouro'){addGold(c.g);toast('+'+c.g+' gold');}
+      else{S.cards[c.id]=lv;if(c.id==='coracao')run.hp=Math.min(stats().maxH,run.hp+1);}
+      if(!prize)dailyAdd('cards');syncUnits();nextCard();};L.appendChild(b);}
   $('mCards').hidden=false;
 }
 function nextCard(){run.pendingLv--;$('mCards').hidden=true;if(run.pendingLv>0)showCards();}
@@ -845,7 +911,7 @@ function showAttrs(){const L=$('attrList');L.innerHTML='';$('attrGold').textCont
     b.innerHTML=`<span class="ic">✧</span><span class="tx"><span class="tag">Personagem</span><b>Gêmeo 0819</b><small>O menino, o primeiro a entrar na luta: 2 bolinhas de glitter, 2 de dano cada, em área. Dano fixo</small></span><span class="pr">0819 gold</span>`;
     b.onclick=()=>{if(!ok){toast('Gold insuficiente');return;}S.gold-=819;S.twin=true;S.twinOn=true;toast('Gêmeo 0819 chegou!');showAttrs();};WL.appendChild(b);}
   {const n=S.angel||0,ok=S.gold>=400&&n<1,b=document.createElement('button');b.className='card'+(ok?'':' off');
-    b.innerHTML=`<span class="ic">✝</span><span class="tx"><span class="tag">Item</span><b>Anjo da Guarda</b><small>Se você for derrotado, revive com 3 corações e a tela é limpa. Gasta ao usar. Máximo 1 guardado${n?' (você tem 1)':''}</small></span><span class="pr">${n?'Guardado':'400 gold'}</span>`;
+    b.innerHTML=`<span class="ic">✝</span><span class="tx"><span class="tag">Item</span><b>Anjo da Guarda</b><small>Se você for derrotado, revive com a vida cheia e a tela é limpa. Gasta ao usar. Máximo 1 guardado${n?' (você tem 1)':''}</small></span><span class="pr">${n?'Guardado':'400 gold'}</span>`;
     b.onclick=()=>{if(n){toast('Você já tem um Anjo guardado');return;}if(!ok){toast('Gold insuficiente');return;}S.gold-=400;S.angel=1;toast('Anjo da Guarda guardado!');showAttrs();};WL.appendChild(b);}
   if(!S.helper){const ok=S.gold>=650,b=document.createElement('button');b.className='card'+(ok?'':' off');
     b.innerHTML=`<span class="ic">A</span><span class="tx"><span class="tag">Personagem</span><b>Ajudante arqueiro</b><small>Igual ao seu arqueiro, mas tudo pela metade: dano, tiros, efeitos</small></span><span class="pr">650 gold</span>`;
