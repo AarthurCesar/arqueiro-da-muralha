@@ -77,7 +77,7 @@ p{margin:0;color:var(--muted);line-height:1.45}
   <img id="heroImg" alt="" style="display:block;margin:0 auto -6px;height:150px">
   <h1>Arqueiro da Muralha</h1>
   <p>Arraste o dedo (ou use WASD / setas) para mover o arqueiro em qualquer direção. O arqueiro atira sozinho. Não deixe os monstros chegarem até você.</p>
-  <p>Cada fase começa do zero: nível, cartas e evoluções de arma valem só naquela fase. Você pode escolher até 5 cartas por fase; se não gostar das que aparecerem, pule e tente no próximo nível. Depois das 5, cada nível dá um prêmio: +1% num atributo sorteado (só naquela fase) ou 5 gold. O que fica para sempre é o que você compra na Loja: atributos e armas. Se perder, o gold volta ao que era no começo da fase.</p>
+  <p>Cada fase começa do zero: nível, cartas e evoluções de arma valem só naquela fase. Você pode escolher até 5 cartas por fase (a evolução de arma também conta); se não gostar das que aparecerem, pule e tente no próximo nível. Depois das 5, cada nível dá sozinho um prêmio sorteado: 5 gold ou +1% num atributo (só naquela fase). O que fica para sempre é o que você compra na Loja: atributos e armas. Se perder, o gold volta ao que era no começo da fase.</p>
   <p id="hubInfo"></p>
   <button class="btn" id="btnStart">Jogar</button>
   <button class="btn ghost" id="btnJourney">Jornada</button>
@@ -185,7 +185,7 @@ const CARDS=[
  {id:'pechincha',n:'Pechincha',t:'Passiva',d:'Cartas e evoluções de arma custam 30% menos',p:60,ic:'%'},
 ];
 const MAX_SLOTS=5;
-// Prêmio de nível depois das 5 cartas: +1% num atributo sorteado (vale só nesta fase) ou 5 gold.
+// Prêmio de nível depois das 5 cartas (sem janela): sorteia entre +1% num atributo sorteado (vale só nesta fase) e 5 gold.
 const LV_BONUS=1, LV_GOLD=5, ATTR_IC={dmg:'▲',atk:'»',mov:'B',xp:'✎'};
 const CARD_BY={}; CARDS.forEach(c=>CARD_BY[c.id]=c);
 const ATTRS=[
@@ -257,7 +257,9 @@ const phaseGold=()=>1+.1*(S.phase-1);
 const cardCost=c=>Math.round(c.p*.4*phaseGold());
 const cardLv=id=>(S.cards&&S.cards[id])||0;
 const ownedCards=()=>Object.keys(S.cards||{}).filter(k=>S.cards[k]>0&&CARD_BY[k]).map(k=>CARD_BY[k]); // na ordem em que foram pegas
-const slotsUsed=()=>ownedCards().length;
+const evoCount=()=>Math.max(0,(S.weapon||0)-(S.baseWeapon||0)); // evoluções de arma nesta fase (contam como carta)
+const slotsUsed=()=>ownedCards().length+evoCount();
+const lc=t=>t[0].toLowerCase()+t.slice(1); // 'Ganho de XP' -> 'ganho de XP'
 const cardDisc=()=>cardLv('pechincha')?.7:1; // Pechincha: 30% mais barato
 
 // ---------- three ----------
@@ -856,8 +858,9 @@ let fl=null;
 function flash(c){scene.background.setHex(c);clearTimeout(fl);fl=setTimeout(()=>scene.background.setHex(0x141a17),90);}
 let tt=null; function toast(t){const el=$('toast');el.textContent=t;el.style.opacity=1;clearTimeout(tt);tt=setTimeout(()=>el.style.opacity=0,1100);}
 let slotKey='';
-function drawSlots(){const own=ownedCards(),k=own.map(c=>c.id).join();if(k===slotKey)return;slotKey=k;
-  let h='<span class="slotlbl">Cartas</span>';for(let i=0;i<MAX_SLOTS;i++){const c=own[i];h+=c?`<span class="slot on" title="${c.n}">${c.ic}</span>`:'<span class="slot"></span>';}
+function drawSlots(){const own=ownedCards(),ev=evoCount(),k=own.map(c=>c.id).join()+'|'+ev;if(k===slotKey)return;slotKey=k;
+  const it=own.map(c=>[c.ic,c.n]);for(let i=0;i<ev;i++)it.push(['★','Evolução de arma']);
+  let h='<span class="slotlbl">Cartas</span>';for(let i=0;i<MAX_SLOTS;i++){const c=it[i];h+=c?`<span class="slot on" title="${c[1]}">${c[0]}</span>`:'<span class="slot"></span>';}
   $('slots').innerHTML=h;}
 function hud(){const st=stats();drawSlots();
   $('hearts').textContent='♥'.repeat(Math.max(0,run.hp))+'♡'.repeat(Math.max(0,st.maxH-run.hp));
@@ -866,36 +869,37 @@ function hud(){const st=stats();drawSlots();
   $('xp').style.width=(100*S.xp/xpNeed(S.lvl))+'%';
   $('bossbar').style.display=run.boss?'block':'none'; if(run.boss)$('bosshp').style.width=(100*run.boss.hp/run.boss.max)+'%';}
 function showCards(){
-  const used=slotsUsed(),full=used>=MAX_SLOTS,disc=cardDisc();
-  // Até 5 cartas por fase, sem melhorias: quem não gostar das oferecidas pula e tenta no próximo nível.
-  // Com as 5 cartas escolhidas, cada nível oferece um prêmio: +1% num atributo sorteado (só nesta fase) ou 5 gold.
-  const pool=full?[]:CARDS.filter(c=>!S.cards[c.id]);
+  const used=slotsUsed(),disc=cardDisc();
+  // Até 5 cartas por fase, e a evolução de arma conta como carta. Sem melhorias: quem não gostar das oferecidas pula e tenta no próximo nível.
+  // Com as 5 escolhidas não abre mais janela: cada nível dá sozinho um prêmio sorteado.
+  if(used>=MAX_SLOTS){levelPrize(run.pendingLv);run.pendingLv=0;return;}
+  const pool=CARDS.filter(c=>!S.cards[c.id]);
   const pick=[];
   const NW=WEAPONS[(S.weapon||0)+1];
   if(NW&&S.phase>=NW.ph)pick.push({id:'_arma',n:'Evoluir: '+NW.n,t:'Evolução de arma',d:NW.d,p:NW.p,ic:'★'});
   while(pick.length<3&&pool.length)pick.push(pool.splice(Math.random()*pool.length|0,1)[0]);
-  const lc=t=>t[0].toLowerCase()+t.slice(1); // 'Ganho de XP' -> 'ganho de XP'
-  if(full){const A=ATTRS[Math.random()*ATTRS.length|0];
-    pick.push({id:'_attr',a:A.id,n:'+'+LV_BONUS+'% de '+lc(A.n),t:'Atributo sorteado',d:'Vale até o fim desta fase',ic:ATTR_IC[A.id],prize:1},
-              {id:'_gold',n:'+'+LV_GOLD+' gold',t:'Gold',d:'Vai direto para o seu gold',ic:'$',prize:1});}
+  if(!pick.length){run.pendingLv=0;return;}
   const newLv=S.lvl-run.pendingLv+1, free=newLv===2;
   $('cardsTitle').textContent='Subiu para o nível '+newLv+'!'+(free?' Carta grátis':'');
-  const rb=run.bon||{},got=ATTRS.filter(A=>rb[A.id]).map(A=>'+'+rb[A.id]+'% de '+lc(A.n));
-  $('cardsSub').textContent=full?'Suas 5 cartas já estão escolhidas. Escolha um prêmio para este nível.'+(got.length?' Bônus nesta fase: '+got.join(', ')+'.':''):'Você pode ter até 5 cartas nesta fase (tem '+used+'). Se não gostar destas, pule e tente no próximo nível.';
+  $('cardsSub').textContent='Você pode ter até 5 cartas nesta fase (tem '+used+'). Se não gostar destas, pule e tente no próximo nível.';
   const L=$('cardList');L.innerHTML='';
   for(const c of pick){const arma=c.id==='_arma';
-    const luck=!free&&!c.prize&&cardLv('sorte')&&Math.random()<.1;
-    const cost=free||luck||c.prize?0:Math.round(cardCost(c)*disc),ok=S.gold>=cost,b=document.createElement('button');b.className='card'+(ok?'':' off');
+    const luck=!free&&cardLv('sorte')&&Math.random()<.1;
+    const cost=free||luck?0:Math.round(cardCost(c)*disc),ok=S.gold>=cost,b=document.createElement('button');b.className='card'+(ok?'':' off');
     b.innerHTML=`<span class="ic">${c.ic}</span><span class="tx"><span class="tag">${c.t}</span><b>${c.n}</b><small>${c.d}</small></span><span class="pr">${cost?cost+' gold':(luck?'Grátis (Sorte)':'Grátis')}</span>`;
     b.onclick=()=>{if(!ok){toast('Gold insuficiente');return;}S.gold-=cost;
-      if(arma){S.weapon=(S.weapon||0)+1;toast('Nova arma: '+WEAPONS[S.weapon].n);dailyAdd('cards');}
-      else if(c.id==='_attr'){run.bon[c.a]=(run.bon[c.a]||0)+LV_BONUS;toast(c.n+' nesta fase');}
-      else if(c.id==='_gold'){addGold(LV_GOLD);toast(c.n);}
-      else{S.cards[c.id]=1;if(c.id==='coracao')run.hp=Math.min(stats().maxH,run.hp+1);dailyAdd('cards');}
-      syncUnits();nextCard();};L.appendChild(b);}
-  $('btnSkip').textContent=full?'Pular':'Pular e guardar gold';
+      if(arma){S.weapon=(S.weapon||0)+1;toast('Nova arma: '+WEAPONS[S.weapon].n);}
+      else{S.cards[c.id]=1;if(c.id==='coracao')run.hp=Math.min(stats().maxH,run.hp+1);}
+      dailyAdd('cards');syncUnits();nextCard();};L.appendChild(b);}
   $('mCards').hidden=false;
 }
+// Prêmio automático de cada nível depois das 5 cartas: metade das vezes 5 gold, metade +1% num atributo sorteado (só nesta fase).
+function levelPrize(n){let g=0;const at={};
+  for(let i=0;i<n;i++){if(Math.random()<.5)g+=LV_GOLD;
+    else{const A=ATTRS[Math.random()*ATTRS.length|0];run.bon[A.id]=(run.bon[A.id]||0)+LV_BONUS;at[A.id]=(at[A.id]||0)+LV_BONUS;}}
+  if(g)addGold(g);
+  const got=g?['+'+g+' gold']:[];ATTRS.forEach(A=>{if(at[A.id])got.push('+'+at[A.id]+'% de '+lc(A.n));});
+  if(got.length)toast('Nível '+S.lvl+': '+got.join(', '));}
 function nextCard(){run.pendingLv--;$('mCards').hidden=true;if(run.pendingLv>0)showCards();}
 $('btnSkip').onclick=nextCard;
 function showAttrs(){const L=$('attrList');L.innerHTML='';$('attrGold').textContent='Você tem '+S.gold+' gold.';
