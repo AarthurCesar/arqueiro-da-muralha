@@ -23,7 +23,6 @@ html,body{height:100%;margin:0;overflow:hidden;background:var(--night);color:var
 .slotlbl{font-size:11px;font-weight:800;color:var(--muted);margin-right:2px}
 .slot{position:relative;width:24px;height:24px;border-radius:7px;background:rgba(20,26,23,.55);border:1px dashed var(--panel2);display:grid;place-items:center;font:700 11px var(--display);color:#1a1306;box-sizing:border-box}
 .slot.on{background:var(--gold);border:1px solid var(--gold)}
-.slot i{position:absolute;right:-5px;bottom:-5px;min-width:13px;height:13px;border-radius:7px;background:var(--night);color:var(--gold);font:800 9px/13px var(--body);font-style:normal;text-align:center;border:1px solid var(--gold);box-sizing:border-box}
 #btnPause{pointer-events:auto;background:var(--panel2);color:var(--ink);border:1px solid var(--panel2);border-radius:10px;padding:6px 10px;font:800 13px var(--body)}
 #btnAttr{pointer-events:auto;background:var(--gold);color:#241a06;border:0;border-radius:10px;padding:6px 10px;font:800 13px var(--body)}
 .modal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(10,14,12,.78);padding:16px max(16px,env(safe-area-inset-right,0px)) 16px max(16px,env(safe-area-inset-left,0px));z-index:5}
@@ -78,7 +77,7 @@ p{margin:0;color:var(--muted);line-height:1.45}
   <img id="heroImg" alt="" style="display:block;margin:0 auto -6px;height:150px">
   <h1>Arqueiro da Muralha</h1>
   <p>Arraste o dedo (ou use WASD / setas) para mover o arqueiro em qualquer direção. O arqueiro atira sozinho. Não deixe os monstros chegarem até você.</p>
-  <p>Cada fase começa do zero: nível, cartas e evoluções de arma valem só naquela fase. Você pode ter até 5 cartas por fase; depois disso, subir de nível melhora as que você já tem. O que fica para sempre é o que você compra na Loja: atributos e armas. Se perder, o gold volta ao que era no começo da fase.</p>
+  <p>Cada fase começa do zero: nível, cartas e evoluções de arma valem só naquela fase. Você pode escolher até 5 cartas por fase; se não gostar das que aparecerem, pule e tente no próximo nível. O que fica para sempre é o que você compra na Loja: atributos e armas. Se perder, o gold volta ao que era no começo da fase.</p>
   <p id="hubInfo"></p>
   <button class="btn" id="btnStart">Jogar</button>
   <button class="btn ghost" id="btnJourney">Jornada</button>
@@ -149,43 +148,43 @@ const $=id=>document.getElementById(id);
 const PZ=2, SPAWNZ=31, HALF=4.6;
 
 // ---------- dados ----------
-// Cartas da fase: até 5 por fase (MAX_SLOTS). Cada carta tem nível máximo (mx); com os 5 espaços cheios, subir de nível só oferece melhorias.
+// Cartas da fase: no máximo 5 por fase (MAX_SLOTS) e sem melhorias. Quem não gostar das oferecidas pula e tenta no próximo nível.
 const CARDS=[
- {id:'dupla',n:'Flecha dupla',t:'Arma',p:60,ic:'II',mx:3,d:L=>'+'+L+(L>1?' flechas':' flecha')+' por tiro'},
- {id:'perf',n:'Flecha perfurante',t:'Arma',p:70,ic:'→',mx:3,d:L=>'Atravessa +'+2*L+' inimigos'},
- {id:'fogo',n:'Flecha de fogo',t:'Arma',p:80,ic:'F',mx:3,d:L=>'Queima: '+50*L+'% do dano por segundo, por 3 s'},
- {id:'gelo',n:'Flecha de gelo',t:'Arma',p:80,ic:'G',mx:3,d:L=>'Inimigo '+(30+10*L)+'% mais lento'},
- {id:'raio',n:'Cajado de raio',t:'Arma nova',p:150,ic:'R',mx:3,d:L=>'Raio pula entre '+(2+L)+' inimigos'},
- {id:'ima',n:'Ímã',t:'Passiva',p:50,ic:'Í',mx:1,d:L=>'Puxa bônus de longe'},
- {id:'sorte',n:'Sorte',t:'Passiva',p:70,ic:'$',mx:3,d:L=>'+'+25*L+'% de gold e '+10*L+'% de chance de cada carta sair de graça'},
- {id:'esc',n:'Escudo',t:'Defesa',p:90,ic:'E',mx:3,d:L=>'Bloqueia 1 toque a cada '+ESC_CD[L]+' s'},
- {id:'chuva',n:'Chuva de flechas',t:'Especial',p:130,ic:'≡',mx:3,d:L=>'A cada '+RAIN_CD[L]+' s, dano na tela toda'},
- {id:'rico',n:'Ricochete',t:'Arma',p:90,ic:'↯',mx:3,d:L=>'O tiro quica nas paredes até '+(1+2*L)+' vezes'},
- {id:'crit',n:'Golpe crítico',t:'Arma',p:80,ic:'!',mx:3,d:L=>(10+10*L)+'% de chance de 3x dano'},
- {id:'expl',n:'Flecha explosiva',t:'Arma',p:110,ic:'*',mx:3,d:L=>'Cada tiro explode numa área '+['','pequena','média','grande'][L]},
- {id:'afiada',n:'Ponta afiada',t:'Arma',p:80,ic:'▲',mx:3,d:L=>'+'+30*L+'% de dano'},
- {id:'rapido',n:'Mão rápida',t:'Arma',p:80,ic:'»',mx:3,d:L=>'+'+30*L+'% de velocidade de tiro'},
- {id:'gigante',n:'Flecha gigante',t:'Arma',p:70,ic:'⬆',mx:2,d:L=>L>1?'Flechas enormes, quase impossível errar':'Flechas bem maiores, mais fáceis de acertar'},
- {id:'exec',n:'Execução',t:'Arma',p:100,ic:'✕',mx:3,d:L=>'Inimigo (não chefe) com menos de '+(10+5*L)+'% de vida morre na hora'},
- {id:'empurra',n:'Flecha de impacto',t:'Arma',p:70,ic:'⇈',mx:3,d:L=>'Cada acerto empurra o inimigo para trás'+(L>2?', muito mais forte':L>1?', mais forte':'')},
- {id:'botas',n:'Botas leves',t:'Passiva',p:50,ic:'B',mx:2,d:L=>'+'+(L>1?70:40)+'% de velocidade de movimento'},
- {id:'estudo',n:'Aprendiz',t:'Passiva',p:60,ic:'✎',mx:3,d:L=>'+'+30*L+'% de XP'},
- {id:'bonus',n:'Caçador de bônus',t:'Passiva',p:60,ic:'◆',mx:2,d:L=>'Bônus aparecem '+(L+1)+'x mais vezes'},
- {id:'mira',n:'Mira automática',t:'Arma',p:120,ic:'◎',mx:1,d:L=>'Seus tiros miram sozinhos no inimigo mais perto'},
- {id:'anjo',n:'Anjo da Guarda',t:'Defesa',p:120,ic:'✝',mx:1,d:L=>'Se você for derrotado nesta fase, revive uma vez com a vida cheia'},
+ {id:'dupla',n:'Flecha dupla',t:'Arma',d:'+1 flecha por tiro',p:60,ic:'II'},
+ {id:'perf',n:'Flecha perfurante',t:'Arma',d:'Atravessa +2 inimigos',p:70,ic:'→'},
+ {id:'fogo',n:'Flecha de fogo',t:'Arma',d:'Queima: 50% do dano por segundo, por 3 s',p:80,ic:'F'},
+ {id:'gelo',n:'Flecha de gelo',t:'Arma',d:'Inimigo 40% mais lento',p:80,ic:'G'},
+ {id:'raio',n:'Cajado de raio',t:'Arma nova',d:'Raio pula entre 3 inimigos',p:150,ic:'R'},
+ {id:'ima',n:'Ímã',t:'Passiva',d:'Puxa bônus de longe',p:50,ic:'Í'},
+ {id:'sorte',n:'Sorte',t:'Passiva',d:'+25% de gold e 10% de chance de cada carta sair de graça',p:70,ic:'$'},
+ {id:'esc',n:'Escudo',t:'Defesa',d:'Bloqueia 1 toque a cada 30 s',p:90,ic:'E'},
+ {id:'chuva',n:'Chuva de flechas',t:'Especial',d:'A cada 15 s, dano na tela toda',p:130,ic:'≡'},
+ {id:'rico',n:'Ricochete',t:'Arma',d:'O tiro quica nas paredes até 3 vezes',p:90,ic:'↯'},
+ {id:'crit',n:'Golpe crítico',t:'Arma',d:'20% de chance de 3x dano',p:80,ic:'!'},
+ {id:'expl',n:'Flecha explosiva',t:'Arma',d:'Cada tiro explode numa área pequena',p:110,ic:'*'},
+ {id:'afiada',n:'Ponta afiada',t:'Arma',d:'+30% de dano',p:80,ic:'▲'},
+ {id:'rapido',n:'Mão rápida',t:'Arma',d:'+30% de velocidade de tiro',p:80,ic:'»'},
+ {id:'gigante',n:'Flecha gigante',t:'Arma',d:'Flechas bem maiores, mais fáceis de acertar',p:70,ic:'⬆'},
+ {id:'exec',n:'Execução',t:'Arma',d:'Inimigo (não chefe) com menos de 15% de vida morre na hora',p:100,ic:'✕'},
+ {id:'empurra',n:'Flecha de impacto',t:'Arma',d:'Cada acerto empurra o inimigo para trás',p:70,ic:'⇈'},
+ {id:'botas',n:'Botas leves',t:'Passiva',d:'+40% de velocidade de movimento',p:50,ic:'B'},
+ {id:'estudo',n:'Aprendiz',t:'Passiva',d:'+30% de XP',p:60,ic:'✎'},
+ {id:'bonus',n:'Caçador de bônus',t:'Passiva',d:'Bônus aparecem 2x mais vezes',p:60,ic:'◆'},
+ {id:'mira',n:'Mira automática',t:'Arma',d:'Seus tiros miram sozinhos no inimigo mais perto',p:120,ic:'◎'},
+ {id:'anjo',n:'Anjo da Guarda',t:'Defesa',d:'Se você for derrotado nesta fase, revive uma vez com a vida cheia',p:120,ic:'✝'},
  // Novas (2026-11-21): 5 de defesa, 4 de ataque, 1 de economia
- {id:'coracao',n:'Coração extra',t:'Defesa',p:100,ic:'♥',mx:2,d:L=>(L>1?'+2 corações':'+1 coração')+' de vida máxima (o novo já vem cheio)'},
- {id:'muralha',n:'Muralha reforçada',t:'Defesa',p:90,ic:'▦',mx:2,d:L=>L>1?'Em cada onda, os 2 primeiros inimigos que passarem não tiram coração (menos o chefe)':'Em cada onda, o 1º inimigo que passar não tira coração (menos o chefe)'},
- {id:'erva',n:'Erva curativa',t:'Defesa',p:90,ic:'+',mx:3,d:L=>'Recupera 1 coração a cada '+HEAL_CD[L]+' s'},
- {id:'estacas',n:'Estacas na muralha',t:'Defesa',p:80,ic:'∧∧',mx:3,d:L=>'Inimigos perto da muralha ficam '+STAKE[L]+'% mais lentos'},
- {id:'gelado',n:'Coração de gelo',t:'Defesa',p:90,ic:'❄',mx:3,d:L=>'Quando você perde um coração, todos os inimigos congelam por '+(1+L)+' s'},
- {id:'lateral',n:'Flechas laterais',t:'Arma',p:90,ic:'Ψ',mx:2,d:L=>'+'+2*L+' flechas em diagonal'},
- {id:'gigantes',n:'Caçador de gigantes',t:'Arma',p:90,ic:'♛',mx:3,d:L=>'+'+40*L+'% de dano em chefes e inimigos grandes'},
- {id:'furia',n:'Fúria',t:'Arma',p:80,ic:'✹',mx:3,d:L=>'Com 1 coração: +'+(25+25*L)+'% de dano e de velocidade de tiro'},
- {id:'certeiro',n:'Tiro certeiro',t:'Arma',p:90,ic:'⊕',mx:3,d:L=>'A cada '+(6-L)+' tiros, 1 tiro com 4x de dano'},
- {id:'pechincha',n:'Pechincha',t:'Passiva',p:60,ic:'%',mx:2,d:L=>'Cartas e melhorias custam '+(L>1?50:30)+'% menos'},
+ {id:'coracao',n:'Coração extra',t:'Defesa',d:'+1 coração de vida máxima (o novo já vem cheio)',p:100,ic:'♥'},
+ {id:'muralha',n:'Muralha reforçada',t:'Defesa',d:'Em cada onda, o 1º inimigo que passar não tira coração (menos o chefe)',p:90,ic:'▦'},
+ {id:'erva',n:'Erva curativa',t:'Defesa',d:'Recupera 1 coração a cada 40 s',p:90,ic:'+'},
+ {id:'estacas',n:'Estacas na muralha',t:'Defesa',d:'Inimigos perto da muralha ficam 40% mais lentos',p:80,ic:'∧∧'},
+ {id:'gelado',n:'Coração de gelo',t:'Defesa',d:'Quando você perde um coração, todos os inimigos congelam por 2 s',p:90,ic:'❄'},
+ {id:'lateral',n:'Flechas laterais',t:'Arma',d:'+2 flechas em diagonal',p:90,ic:'Ψ'},
+ {id:'gigantes',n:'Caçador de gigantes',t:'Arma',d:'+40% de dano em chefes e inimigos grandes',p:90,ic:'♛'},
+ {id:'furia',n:'Fúria',t:'Arma',d:'Com 1 coração: +50% de dano e de velocidade de tiro',p:80,ic:'✹'},
+ {id:'certeiro',n:'Tiro certeiro',t:'Arma',d:'A cada 5 tiros, 1 tiro com 4x de dano',p:90,ic:'⊕'},
+ {id:'pechincha',n:'Pechincha',t:'Passiva',d:'Cartas e evoluções de arma custam 30% menos',p:60,ic:'%'},
 ];
-const MAX_SLOTS=5, ESC_CD=[0,30,22,15], RAIN_CD=[0,15,12,9], HEAL_CD=[0,40,30,20], STAKE=[0,40,55,70];
+const MAX_SLOTS=5;
 const CARD_BY={}; CARDS.forEach(c=>CARD_BY[c.id]=c);
 const ATTRS=[
  {id:'dmg',n:'Dano',d:'+10% de dano'},
@@ -257,8 +256,7 @@ const cardCost=c=>Math.round(c.p*.4*phaseGold());
 const cardLv=id=>(S.cards&&S.cards[id])||0;
 const ownedCards=()=>Object.keys(S.cards||{}).filter(k=>S.cards[k]>0&&CARD_BY[k]).map(k=>CARD_BY[k]); // na ordem em que foram pegas
 const slotsUsed=()=>ownedCards().length;
-const cDesc=(c,L)=>typeof c.d==='function'?c.d(L):c.d;
-const cardDisc=()=>[1,.7,.5][cardLv('pechincha')]; // Pechincha
+const cardDisc=()=>cardLv('pechincha')?.7:1; // Pechincha: 30% mais barato
 
 // ---------- three ----------
 const renderer=new THREE.WebGLRenderer({canvas:$('c'),antialias:true});
@@ -508,8 +506,8 @@ function shoot(from,dmg,count,gold,half,power){
   // Escopeta: cada tiro vira vários chumbos bem espalhados.
   const sp=W.spread||.14; if(W.pellets)count=count+W.pellets-1;
   const angs=[]; for(let i=0;i<count;i++)angs.push(ang+(i-(count-1)/2)*sp+(W.pellets?(Math.random()-.5)*.08:0));
-  // Flechas laterais: +2 em diagonal por nível (só o arqueiro)
-  if(st.lateral&&!half){const o=[.5,.9];for(let k=0;k<st.lateral;k++)angs.push(ang-o[k],ang+o[k]);}
+  // Flechas laterais: +2 em diagonal (só o arqueiro)
+  if(st.lateral&&!half)angs.push(ang-.5,ang+.5);
   angs.forEach((a,i)=>{
     const m=new THREE.Mesh(arrowGeo,mat); {const g=(st.big?1+.8*st.big:1)*(power?1.5:1);m.scale.set(W.size*1.4*g,W.size*1.4*g,W.size*g);} m.position.set(from.x,1,from.z+.5); m.rotation.y=a; m.add(new THREE.Mesh(trailGeo,trailMat(gold||power?0xffc94a:W.col))); scene.add(m);
     if(i===0)sfx('shot');
@@ -547,7 +545,7 @@ function hitEnemy(e,ar){
   if(st.raio){let n=0;const mx=ar.half?1:2+st.raio;for(const o of run.en){if(o===e||n>=mx)continue;if(o.m.position.distanceTo(e.m.position)<4.5){hurt(o,ar.dmg*.6);lightning(e.m.position,o.m.position);n++;}}}
 }
 function loseHeart(){
-  if(run.shield){run.shield=false;run.shieldT=ESC_CD[stats().esc]||30;toast('Escudo bloqueou!');{const p=player.position.clone();ringFx(p,0x9fdcff,3.4,7,.35);burst(p,0xbfe8ff,12,6,.6);shake(.4);}return;}
+  if(run.shield){run.shield=false;run.shieldT=30;toast('Escudo bloqueou!');{const p=player.position.clone();ringFx(p,0x9fdcff,3.4,7,.35);burst(p,0xbfe8ff,12,6,.6);shake(.4);}return;}
   run.hp--; run.hurt=1; flash(0xe2574c); sfx('hurt'); archerHurt(player); shake(.9); bump($('hearts'));
   {const st=stats();if(run.hp>0&&st.gelado){run.freeze=1+st.gelado;toast('Coração de gelo: inimigos congelados!');ringFx(player.position.clone(),0xa8e4ff,1,9,.45);}
    else if(run.hp===1&&st.fury)toast('Fúria! Mais dano e mais velocidade');}
@@ -785,9 +783,9 @@ function step(dt){
   run.triple=Math.max(0,run.triple-dt); run.slowAll=Math.max(0,run.slowAll-dt);
   if(st.esc&&!run.shield){run.shieldT-=dt;if(run.shieldT<=0)run.shield=true;}
   if(run.shield&&!shieldMesh.visible){const p=player.position.clone();ringFx(p,0x9fdcff,5,3.4,.3);} shieldMesh.visible=!!run.shield; animShield(dt,run.t);
-  if(st.chuva){run.rainT-=dt;if(run.rainT<=0){run.rainT=RAIN_CD[st.chuva]||15;flash(0xe8b14a);for(const e of [...run.en])hurt(e,st.dmg*2);toast('Chuva de flechas!');}}
-  // Erva curativa: sem vida cheia, recupera 1 coração a cada X s
-  if(st.erva){const cd=HEAL_CD[st.erva];if(run.hp<st.maxH){run.healT=(run.healT??cd)-dt;if(run.healT<=0){run.healT=cd;run.hp++;toast('Erva curativa: +1 coração');ringFx(player.position.clone(),0x7dffa0,1,3.4,.4);sfx('bonus');bump($('hearts'));}}else run.healT=cd;}
+  if(st.chuva){run.rainT-=dt;if(run.rainT<=0){run.rainT=15;flash(0xe8b14a);for(const e of [...run.en])hurt(e,st.dmg*2);toast('Chuva de flechas!');}}
+  // Erva curativa: sem vida cheia, recupera 1 coração a cada 40 s
+  if(st.erva){const cd=40;if(run.hp<st.maxH){run.healT=(run.healT??cd)-dt;if(run.healT<=0){run.healT=cd;run.hp++;toast('Erva curativa: +1 coração');ringFx(player.position.clone(),0x7dffa0,1,3.4,.4);sfx('bonus');bump($('hearts'));}}else run.healT=cd;}
   // Coração de gelo: inimigos parados por alguns segundos
   const fz0=run.freeze>0; run.freeze=Math.max(0,(run.freeze||0)-dt); const unf=fz0&&!(run.freeze>0);
   stakeM.visible=!!st.estacas;
@@ -816,7 +814,7 @@ function step(dt){
     if(e.hp<=0){kill(e);if(run.done)return;continue;}
     let sp=e.sp*(e.slow>0?(e.slowF||.6):1)*(run.slowAll>0?.5:1)*(run.freeze>0?0:1);
     const p=e.m.position;
-    if(st.estacas&&p.z<PZ+7)sp*=1-STAKE[st.estacas]/100; // Estacas na muralha
+    if(st.estacas&&p.z<PZ+7)sp*=.6; // Estacas na muralha: 40% mais lentos
     if(knight&&Math.abs(p.x-knight.position.x)<1.1+e.r&&Math.abs(p.z-knight.position.z)<.6+e.r){sp=0;e.hp-=st.dmg*dt;}
     p.z-=sp*dt;
     // animação: balanço ao andar, amassa quando leva tiro, chefe cresce ao entrar
@@ -856,8 +854,8 @@ let fl=null;
 function flash(c){scene.background.setHex(c);clearTimeout(fl);fl=setTimeout(()=>scene.background.setHex(0x141a17),90);}
 let tt=null; function toast(t){const el=$('toast');el.textContent=t;el.style.opacity=1;clearTimeout(tt);tt=setTimeout(()=>el.style.opacity=0,1100);}
 let slotKey='';
-function drawSlots(){const own=ownedCards(),k=own.map(c=>c.id+S.cards[c.id]).join();if(k===slotKey)return;slotKey=k;
-  let h='<span class="slotlbl">Cartas</span>';for(let i=0;i<MAX_SLOTS;i++){const c=own[i],l=c&&S.cards[c.id];h+=c?`<span class="slot on" title="${c.n}">${c.ic}${l>1?`<i>${l}</i>`:''}</span>`:'<span class="slot"></span>';}
+function drawSlots(){const own=ownedCards(),k=own.map(c=>c.id).join();if(k===slotKey)return;slotKey=k;
+  let h='<span class="slotlbl">Cartas</span>';for(let i=0;i<MAX_SLOTS;i++){const c=own[i];h+=c?`<span class="slot on" title="${c.n}">${c.ic}</span>`:'<span class="slot"></span>';}
   $('slots').innerHTML=h;}
 function hud(){const st=stats();drawSlots();
   $('hearts').textContent='♥'.repeat(Math.max(0,run.hp))+'♡'.repeat(Math.max(0,st.maxH-run.hp));
@@ -867,30 +865,25 @@ function hud(){const st=stats();drawSlots();
   $('bossbar').style.display=run.boss?'block':'none'; if(run.boss)$('bosshp').style.width=(100*run.boss.hp/run.boss.max)+'%';}
 function showCards(){
   const used=slotsUsed(),full=used>=MAX_SLOTS,disc=cardDisc();
-  // Até 5 cartas por fase. Com os 5 espaços cheios, só aparecem melhorias das cartas que você já tem.
-  const pool=CARDS.filter(c=>{const l=cardLv(c.id);return l?l<c.mx:!full;});
+  // Até 5 cartas por fase, sem melhorias: quem não gostar das oferecidas pula e tenta no próximo nível.
+  const pool=full?[]:CARDS.filter(c=>!S.cards[c.id]);
   const pick=[];
   const NW=WEAPONS[(S.weapon||0)+1];
   if(NW&&S.phase>=NW.ph)pick.push({id:'_arma',n:'Evoluir: '+NW.n,t:'Evolução de arma',d:NW.d,p:NW.p,ic:'★'});
   while(pick.length<3&&pool.length)pick.push(pool.splice(Math.random()*pool.length|0,1)[0]);
-  if(!pick.length){const g=Math.round(40*phaseGold()); // tudo no nível máximo: prêmio simples
-    if(run.hp<stats().maxH)pick.push({id:'_cura',n:'Poção',t:'Prêmio',d:'Recupera 1 coração',ic:'+'});
-    pick.push({id:'_ouro',n:'Bolsa de gold',t:'Prêmio',d:'+'+g+' gold',ic:'$',g});}
+  if(!pick.length){run.pendingLv=0;if(!run.fullTip){run.fullTip=1;toast('Suas 5 cartas já estão escolhidas');}return;}
   const newLv=S.lvl-run.pendingLv+1, free=newLv===2;
   $('cardsTitle').textContent='Subiu para o nível '+newLv+'!'+(free?' Carta grátis':'');
-  $('cardsSub').textContent=full?'Suas 5 cartas já estão escolhidas. Agora cada nível melhora uma delas.':'Você pode ter até 5 cartas nesta fase (tem '+used+'). Escolha uma ou pule para guardar o gold.';
+  $('cardsSub').textContent=full?'Suas 5 cartas já estão escolhidas, mas você ainda pode evoluir a arma.':'Você pode ter até 5 cartas nesta fase (tem '+used+'). Se não gostar destas, pule e tente no próximo nível.';
   const L=$('cardList');L.innerHTML='';
-  for(const c of pick){const prize=c.t==='Prêmio',arma=c.id==='_arma',lv=prize||arma?0:cardLv(c.id)+1;
-    const luck=!free&&!prize&&cardLv('sorte')&&Math.random()<.1*cardLv('sorte');
-    const cost=free||luck||prize?0:Math.round(cardCost(c)*(lv>1?1+.5*(lv-1):1)*disc),ok=S.gold>=cost,b=document.createElement('button');b.className='card'+(ok?'':' off');
-    const tag=prize||arma?c.t:lv>1?'Melhoria · Nv '+lv+' de '+c.mx:c.t+' · Carta nova';
-    b.innerHTML=`<span class="ic">${c.ic}</span><span class="tx"><span class="tag">${tag}</span><b>${c.n}</b><small>${cDesc(c,lv)}</small></span><span class="pr">${cost?cost+' gold':(luck?'Grátis (Sorte)':'Grátis')}</span>`;
+  for(const c of pick){const arma=c.id==='_arma';
+    const luck=!free&&cardLv('sorte')&&Math.random()<.1;
+    const cost=free||luck?0:Math.round(cardCost(c)*disc),ok=S.gold>=cost,b=document.createElement('button');b.className='card'+(ok?'':' off');
+    b.innerHTML=`<span class="ic">${c.ic}</span><span class="tx"><span class="tag">${c.t}</span><b>${c.n}</b><small>${c.d}</small></span><span class="pr">${cost?cost+' gold':(luck?'Grátis (Sorte)':'Grátis')}</span>`;
     b.onclick=()=>{if(!ok){toast('Gold insuficiente');return;}S.gold-=cost;
       if(arma){S.weapon=(S.weapon||0)+1;toast('Nova arma: '+WEAPONS[S.weapon].n);}
-      else if(c.id==='_cura'){run.hp=Math.min(stats().maxH,run.hp+1);toast('+1 coração');}
-      else if(c.id==='_ouro'){addGold(c.g);toast('+'+c.g+' gold');}
-      else{S.cards[c.id]=lv;if(c.id==='coracao')run.hp=Math.min(stats().maxH,run.hp+1);}
-      if(!prize)dailyAdd('cards');syncUnits();nextCard();};L.appendChild(b);}
+      else{S.cards[c.id]=1;if(c.id==='coracao')run.hp=Math.min(stats().maxH,run.hp+1);}
+      dailyAdd('cards');syncUnits();nextCard();};L.appendChild(b);}
   $('mCards').hidden=false;
 }
 function nextCard(){run.pendingLv--;$('mCards').hidden=true;if(run.pendingLv>0)showCards();}
