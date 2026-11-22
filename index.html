@@ -456,6 +456,9 @@ function clearWorld(){ if(!run) return; [...run.en,...run.ar,...run.bo,...run.fx
 // Inimigos bem mais fortes, rápidos e numerosos; gold x3 e prêmio grande.
 let HARD=false;
 const HARD_WAVES=5;
+// Peso da fase difícil (1 = igual à fase normal). Todos os números ficam aqui para ajustar fácil.
+// 2026-11-22: mais leve (antes: vida 2,5x, 1,5x inimigos, 1,3x velocidade, intervalo 0,6x, chefe +60% e reforços a cada 3 s).
+const HARD_K={hp:1.5,count:1.25,speed:1.1,interval:.85,minInt:.3,boss:1.3,summon:4};
 function isHardPhase(p){const k=Math.floor((p-1)/5);if(!S.seed)S.seed=1+(Math.random()*1e6|0);
   const h=Math.abs(Math.sin(S.seed*.0137+k*12.9898)*43758.5453)%1,lo=k===0?2:1; // no 1º mapa nunca é a fase 1
   return p===5*k+lo+Math.floor(h*(6-lo));}
@@ -474,10 +477,10 @@ function startPhase(keep){
   if(HARD){const red=new THREE.Color(1,.68,.62);ground.material.color.multiply(red);lane.material.color.multiply(red);}
   syncUnits(); hud(); if(HARD){banner('FASE DIFÍCIL!');toast('Surpresa! Muito gold, muito perigo');sfx('boss');shake(.6);}else toast('Fase '+S.phase+': '+era().n);
 }
-function waveCount(w){return Math.round((6+2*w+Math.min(30,Math.round(.8*(S.phase-1))))*(HARD?1.5:1));}
+function waveCount(w){return Math.round((6+2*w+Math.min(30,Math.round(.8*(S.phase-1))))*(HARD?HARD_K.count:1));}
 // Vida dos inimigos pensada para 200+ fases: x7 na fase 20, x23 na 50, x65 na 100, x209 na 200 (fase 1 pela metade).
-function hpScale(){const q=S.phase-1;return (1+.25*q+.004*q*q)*(S.phase===1?.5:1)*(HARD?2.5:1);}
-function waveInterval(){return Math.max(HARD?.22:.35,(1.25-.03*S.phase-.05*run.wave)*(HARD?.6:1));}
+function hpScale(){const q=S.phase-1;return (1+.25*q+.004*q*q)*(S.phase===1?.5:1)*(HARD?HARD_K.hp:1);}
+function waveInterval(){return Math.max(HARD?HARD_K.minInt:.35,(1.25-.03*S.phase-.05*run.wave)*(HARD?HARD_K.interval:1));}
 function pickType(){const w=run.wave,p=S.phase,pool=['goblin','goblin'];
   if(w>=2||p>1)pool.push('lobo'); if(w>=3||p>1)pool.push('morcego'); if(w>=4||p>1)pool.push('golem'); return pool[Math.random()*pool.length|0];}
 // Inimigo 2D desenhado: formato pela era, olhos bravos olhando para a muralha, asas no voador, chifres no chefe.
@@ -510,8 +513,8 @@ function spawn(type,x,z){
   const T=ETYPES[type],V=era()[type],sc=hpScale(),m=mkSprite(enemyTex(V,type),1,1,T.fly?1.6:1);
   const s=T.r*2*1.75; m.scale.set(s,s,1); m.material.rotation=0;
   m.position.set(x??(Math.random()*2-1)*HALF, T.fly?1.6:1, z??SPAWNZ); scene.add(m);
-  const e={m,type,T,hp:T.hp*sc,max:T.hp*sc,sp:T.sp*Math.min(1.8,1+.03*(S.phase-1))*(HARD?1.3:1),r:T.r,x0:m.position.x,ph:Math.random()*6,burn:0,burnD:0,slow:0,sumT:4,s,wp:Math.random()*6,hitT:0,grow:T.boss?0:1};
-  if(HARD&&T.boss){e.hp*=1.6;e.max*=1.6;}
+  const e={m,type,T,hp:T.hp*sc,max:T.hp*sc,sp:T.sp*Math.min(1.8,1+.03*(S.phase-1))*(HARD?HARD_K.speed:1),r:T.r,x0:m.position.x,ph:Math.random()*6,burn:0,burnD:0,slow:0,sumT:4,s,wp:Math.random()*6,hitT:0,grow:T.boss?0:1};
+  if(HARD&&T.boss){e.hp*=HARD_K.boss;e.max*=HARD_K.boss;}
   run.en.push(e); if(T.boss) run.boss=e; return e;
 }
 function nearest(x,z){let b=null,bd=1e9;for(const e of run.en){const d=(e.m.position.x-x)**2+(e.m.position.z-z)**2;if(d<bd){bd=d;b=e;}}return b;}
@@ -841,7 +844,7 @@ function step(dt){
     {const g=e.grow<1?Math.max(.05,backOut(e.grow)):1,b=e.T.fly?Math.sin(e.wp*1.7)*.08:Math.abs(Math.sin(e.wp))*.07,h=e.hitT>0?e.hitT/.15:0,z=e.s*g;
      e.m.material.rotation=e.T.fly?Math.sin(e.wp*.8)*.12:Math.sin(e.wp)*.1; e.m.scale.set(z*(1-b*.6+h*.25),z*(1+b-h*.2),1);}
     if(e.T.fly)p.x=Math.max(-HALF,Math.min(HALF,e.x0+Math.sin(run.t*3+e.ph)*1.6));
-    if(e.T.boss&&!(run.freeze>0)){e.sumT-=dt;if(e.sumT<=0){e.sumT=HARD?3:5;spawn('goblin',p.x-1.5,p.z+1);spawn('goblin',p.x+1.5,p.z+1);}}
+    if(e.T.boss&&!(run.freeze>0)){e.sumT-=dt;if(e.sumT<=0){e.sumT=HARD?HARD_K.summon:5;spawn('goblin',p.x-1.5,p.z+1);spawn('goblin',p.x+1.5,p.z+1);}}
     if(p.z<=PZ+e.r||(Math.abs(p.x-player.position.x)<e.r+.6&&Math.abs(p.z-PPZ)<e.r+.6)){scene.remove(e.m);run.en.splice(run.en.indexOf(e),1);
       if(e.T.boss){run.boss=null;run.bossHp=e.hp;run.hp=1;run.shield=false;}
       else if(st.muralha&&(run.wallUsed||0)<st.muralha){run.wallUsed=(run.wallUsed||0)+1;toast('Muralha reforçada segurou!');burst(p,0xd9c3a0,10,5,.7);ringFx(p.clone(),0xd9c3a0,.8,3,.3);shake(.3);continue;}
