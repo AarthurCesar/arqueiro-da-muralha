@@ -45,6 +45,7 @@ p{margin:0;color:var(--muted);line-height:1.45}
 .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--panel2)}
 #mStart{background:var(--night)}
 #hubInfo{color:var(--ink);font-weight:700;text-align:center}
+#upd{position:fixed;left:50%;top:calc(18px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:20;background:var(--gold);color:#241a06;font:800 15px var(--body);padding:10px 16px;border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,.45);white-space:nowrap}
 #toast{position:fixed;left:50%;top:40%;transform:translateX(-50%);font:700 22px var(--display);color:var(--gold);text-shadow:0 2px 8px #000;pointer-events:none;opacity:0;transition:opacity .3s;text-align:center;width:90%}
 #fxl{position:fixed;inset:0;pointer-events:none;overflow:hidden}
 .dmg{position:absolute;font:800 15px var(--body);color:#fff;text-shadow:0 0 3px #000,0 2px 2px #000;transform:translate(-50%,-50%);animation:dmgUp .6s ease-out forwards;white-space:nowrap}
@@ -83,6 +84,7 @@ p{margin:0;color:var(--muted);line-height:1.45}
   <div class="bar" id="bossbar"><i id="bosshp"></i></div>
 </div>
 <div id="toast"></div>
+<div id="upd" hidden>Versão nova! Atualizando o jogo...</div>
 
 <div class="modal" id="mStart"><div class="box">
   <img id="heroImg" alt="" style="display:block;margin:0 auto -6px;height:150px">
@@ -99,7 +101,7 @@ p{margin:0;color:var(--muted);line-height:1.45}
   <button class="btn ghost" id="btnShop">Loja</button>
   <button class="btn ghost" id="btnQuit">Sair</button>
   <div class="row" id="testBar" hidden style="flex-wrap:wrap;justify-content:center"><button class="btn ghost" id="tPrev">Fase -5</button><button class="btn ghost" id="tNext">Fase +5</button><button class="btn ghost" id="tNext50">Fase +50</button><button class="btn ghost" id="tGold">+1000 gold</button><button class="btn ghost" id="tRare">Moeda rara: 0,819%</button><button class="btn ghost" id="tEv">Evento: automático</button><button class="btn ghost" id="tEvAdd">+50 itens do evento</button></div>
-  <p class="tag">Protótipo · formas simples no lugar da arte</p>
+  <p class="tag" id="verTag">Protótipo · formas simples no lugar da arte</p>
 </div></div>
 <div class="modal" id="mCards" hidden><div class="box">
   <h2 id="cardsTitle">Subiu de nível!</h2>
@@ -1181,7 +1183,8 @@ function openPause(){if(!run||run.done||paused())return;
 $('btnPause').onclick=openPause;
 addEventListener('keydown',e=>{if(e.key==='Escape'||e.key==='p'||e.key==='P'){if(!$('mPause').hidden)$('mPause').hidden=true;else openPause();}});
 $('pResume').onclick=()=>{$('mPause').hidden=true;};
-$('pSound').onclick=()=>{muted=!muted;$('pSound').textContent='Som: '+(muted?'desligado':'ligado');};
+$('pSound').onclick=()=>{muted=!muted;$('pSound').textContent='Som: '+(muted?'desligado':'ligado');try{localStorage.setItem('arqueiro-som',muted?'0':'1');}catch(_){}};
+try{if(localStorage.getItem('arqueiro-som')==='0'){muted=true;$('pSound').textContent='Som: desligado';}}catch(_){}
 $('pRestart').onclick=()=>{$('mPause').hidden=true;$('mCards').hidden=true;const k=keepHalf();startPhase();if(k)toast('+'+k+' gold guardado');};
 $('pMenu').onclick=()=>{$('mPause').hidden=true;$('mCards').hidden=true;keepHalf();clearWorld();run=null;carry=false;showHub();};
 let carry=false;
@@ -1192,7 +1195,7 @@ function load(){try{const v=JSON.parse(localStorage.getItem(SAVE));if(!v||!v.att
   if(!v.wv){const up=i=>i>=3?i+1:i;v.owned=(v.owned||[0]).map(up);v.baseWeapon=up(v.baseWeapon||0);v.weapon=up(v.weapon||0);v.wv=2;} // Escopeta entrou no índice 3
   return Object.assign(fresh(),v);}catch(_){return null;}}
 function showHub(){resetPhaseStuff();ensureDaily();save();$('dailyBadge').hidden=!dailyClaimable();$('testBar').hidden=location.hash!=='#teste';$('hubInfo').textContent='Fase '+S.phase+' ('+era().n+') · '+stats().W.n+' · '+S.gold+' gold · recorde: fase '+(S.best||0);
-  $('btnStart').textContent='Jogar fase '+S.phase; evHubDraw(); $('mStart').hidden=false;}
+  $('btnStart').textContent='Jogar fase '+S.phase; evHubDraw(); $('mStart').hidden=false; maybeUpdate();}
 $('btnShop').onclick=showAttrs;
 function showArms(){const L=$('armsList');L.innerHTML='';S.owned=S.owned||[0];
   const evq=evEquipped();
@@ -1236,6 +1239,28 @@ function resize(){renderer.setSize(innerWidth,innerHeight);const asp=innerWidth/
   cam.left=-W/2;cam.right=W/2;cam.top=H/2;cam.bottom=-H/2;const zc=-1.6+H/2;cam.position.set(0,60,zc);cam.lookAt(0,0,zc);cam.updateProjectionMatrix();}
 addEventListener('resize',resize); resize();
 $('heroImg').src=archerCanvas('front',PAL_MAIN).toDataURL();
+// ---------- Atualização automática ----------
+// No site, cada publicação grava version.json com a versão nova. O jogo confere a cada minuto e quando você volta para a aba.
+// Se tiver versão nova, recarrega sozinho quando estiver no menu (nunca no meio da fase). O progresso fica salvo.
+const BUILD='1e56451374',BUILD_DATE='26/11 18:17'; // trocados na hora de publicar no site
+let updWant=null,updGoing=false;
+function menuLivre(){return !$('mStart').hidden&&(!run||run.done)&&['mCards','mAttr','mQuit','mJourney','mDaily','mEvent','mArms','mPause','mMsg'].every(id=>$(id).hidden);}
+function maybeUpdate(){if(!updWant||updGoing||!menuLivre())return;updGoing=true;save();
+  try{sessionStorage.setItem('arqueiro-upd',updWant+'|'+Date.now());}catch(_){}
+  $('upd').hidden=false;
+  setTimeout(()=>{if(!menuLivre()){updGoing=false;$('upd').hidden=true;return;} // apertou Jogar nesse meio tempo: espera voltar ao menu
+    save();location.replace(location.pathname+'?v='+encodeURIComponent(updWant)+location.hash);},900);}
+async function checkUpdate(){if(BUILD==='dev'||updWant||document.hidden)return;
+  try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const j=await r.json();
+    if(!j||!j.v||j.v===BUILD)return;let tried='';try{tried=sessionStorage.getItem('arqueiro-upd')||'';}catch(_){}
+    const [tv,tt]=tried.split('|');if(tv===j.v&&Date.now()-(+tt||0)<10*60e3)return; // acabou de tentar essa versão: não fica recarregando em loop
+    updWant=j.v;maybeUpdate();}catch(_){}}
+setInterval(checkUpdate,60e3); setTimeout(checkUpdate,4e3);
+setInterval(()=>{if(updWant)maybeUpdate();},2e3); // já sabe que tem versão nova: atualiza assim que o menu ficar livre
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkUpdate();});
+addEventListener('pageshow',e=>{if(e.persisted)checkUpdate();});
+if(BUILD_DATE)$('verTag').textContent+=' · versão de '+BUILD_DATE;
+if(BUILD!=='dev'&&/[?&]v=/.test(location.search))try{history.replaceState(null,'',location.pathname+location.hash);}catch(_){} // tira o ?v= do endereço
 S=load()||fresh(); showHub(); requestAnimationFrame(frame);
 })();
 </script>
