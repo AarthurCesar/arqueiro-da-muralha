@@ -62,7 +62,6 @@ p{margin:0;color:var(--muted);line-height:1.45}
 .evhub img{width:46px;height:46px;flex:none;filter:drop-shadow(0 2px 2px rgba(0,0,0,.45))}
 .evhub .tx{flex:1;min-width:0}.evhub small{display:block;font-weight:700;font-size:13px;opacity:.95;margin-top:2px}
 .evhub .mbar{background:rgba(0,0,0,.32)}.evhub .mbar>i{background:#fff}
-.evhub.off{background:var(--panel2);text-shadow:none;color:var(--ink);box-shadow:none}.evhub.off small{color:var(--muted)}
 #evPill{display:inline-flex;align-items:center;gap:4px;padding:2px 9px 2px 4px}#evPill img{width:20px;height:20px}
 .evfly{position:absolute;width:26px;height:26px;transform:translate(-50%,-50%);transition:left .6s cubic-bezier(.5,0,.8,.4),top .6s cubic-bezier(.4,-.4,.8,.6);pointer-events:none;filter:drop-shadow(0 2px 2px rgba(0,0,0,.5))}
 .els{display:grid;grid-template-columns:1fr 1fr;gap:6px}
@@ -95,7 +94,7 @@ p{margin:0;color:var(--muted);line-height:1.45}
   <button class="btn" id="btnStart">Jogar</button>
   <button class="btn ghost" id="btnJourney">Jornada</button>
   <button class="btn ghost" id="btnDaily">Missões diárias <span id="dailyBadge" class="badge" hidden>!</span></button>
-  <button class="btn ghost" id="btnEvent">Eventos <span id="evBadge" class="badge" hidden>!</span></button>
+  <button class="btn ghost" id="btnEvent" hidden>Eventos <span id="evBadge" class="badge" hidden>!</span></button>
   <button class="btn ghost" id="btnArms">Armas</button>
   <button class="btn ghost" id="btnShop">Loja</button>
   <button class="btn ghost" id="btnQuit">Sair</button>
@@ -138,8 +137,6 @@ p{margin:0;color:var(--muted);line-height:1.45}
 <div class="modal" id="mEvent" hidden><div class="box">
   <h2>Eventos</h2>
   <div id="evMain" style="display:flex;flex-direction:column;gap:10px"></div>
-  <p class="tag">Calendário (todo ano)</p>
-  <div id="evList" style="display:flex;flex-direction:column;gap:8px"></div>
   <button class="btn" id="btnEventClose">Voltar ao menu</button>
 </div></div>
 <div class="modal" id="mArms" hidden><div class="box">
@@ -498,7 +495,6 @@ function evOcc(e,now){const y=now.getFullYear();for(const yy of [y-1,y,y+1]){con
 let testEv=null; // modo #teste: força um evento
 function evActive(now){now=now||new Date();if(testEv)return Object.assign(evOcc(EV_BY[testEv],now),{on:true,test:true});
   for(const e of EVENTS){const o=evOcc(e,now);if(o.on)return o;}return null;}
-function evNextUp(now){now=now||new Date();let best=null;for(const e of EVENTS){const o=evOcc(e,now);if(!o.on&&(!best||o.a<best.a))best=o;}return best;}
 const dm=d=>String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0');
 function emDias(d,now){const n=Math.round((day0(d)-day0(now))/864e5);return n<=0?'hoje':n===1?'amanhã':'em '+n+' dias';}
 
@@ -636,29 +632,25 @@ function drawEvPill(){const A=run&&run.ev,P=$('evPill');if(!A){if(!P.hidden)P.hi
   const own=S.ev.own.includes(A.e.id),n=S.ev.p[A.key]||0,k=A.key+'|'+own+'|'+n;if(k===evPillKey)return;evPillKey=k;
   P.hidden=false;P.title=A.e.n;P.innerHTML='<img src="'+EV_ICON[A.e.id]+'" alt="">'+(own?'✓':n+'/'+EV_GOAL);}
 function evHubDraw(){const now=new Date(),A=evActive(now),H=$('evHub');
-  if(A){const v=S.ev,own=v.own.includes(A.e.id),n=v.p[A.key]||0,W=EVW[A.e.id];H.className='evhub';
-    H.style.setProperty('--e1',A.e.c1);H.style.setProperty('--e2',A.e.c2);
-    H.innerHTML=`<img src="${EV_ICON[A.e.id]}" alt=""><span class="tx">Evento de ${A.e.n}${A.test?' (teste)':''}!<small>${own?'Você já tem o '+W.n+'. Agora cada '+A.e.item1+' vale gold.':'Junte '+EV_GOAL+' '+A.e.item+' e ganhe o '+W.n+'. Termina '+emDias(A.b,now)+' ('+dm(A.b)+').'}</small>${own?'':`<div class="mbar"><i style="width:${100*n/EV_GOAL}%"></i></div>`}</span>`;
-    $('evBadge').hidden=own;}
-  else{const N=evNextUp(now);H.className='evhub off';
-    H.innerHTML=`<img src="${EV_ICON[N.e.id]}" alt=""><span class="tx">Próximo evento: ${N.e.n}<small>Começa ${emDias(N.a,now)} (${dm(N.a)}). Arma especial: ${EVW[N.e.id].n}.</small></span>`;$('evBadge').hidden=true;}
-  H.hidden=false;}
-function showEvent(){const now=new Date(),A=evActive(now),v=S.ev,O=A||evNextUp(now),e=O.e,W=EVW[e.id],own=v.own.includes(e.id),n=v.p[O.key]||0,best=WEAPONS[Math.max(...S.owned)].n;
-  let h=`<div class="evhub${A?'':' off'}" style="--e1:${e.c1};--e2:${e.c2};cursor:default"><img src="${EV_ICON[e.id]}" alt=""><span class="tx">${A?'Agora: ':'Próximo evento: '}${e.n}${A&&A.test?' (teste)':''}<small>${dm(O.a)} a ${dm(O.b)} · ${A?'termina '+emDias(O.b,now):'começa '+emDias(O.a,now)}</small></span></div>`;
-  h+=`<p>${A?(own?'Você já ganhou a arma deste evento. Agora cada '+e.item1+' que cair vale gold.':'Derrote inimigos para juntar '+e.item+': cada chefe dá 10 e na fase difícil cai o dobro. Com '+EV_GOAL+' você ganha a arma especial, que só sai neste evento e fica com você para sempre.'):'Durante o evento, os inimigos deixam cair '+e.item+'. Junte '+EV_GOAL+' para ganhar a arma especial, que só sai nesse evento e fica com você para sempre.'}</p>`;
-  if(A&&!own)h+=`<div><div class="row"><b>${n}/${EV_GOAL} ${e.item}</b><span class="tag">faltam ${EV_GOAL-n}</span></div><div class="mbar" style="height:12px"><i style="width:${100*n/EV_GOAL}%"></i></div></div>`;
+  // Sem aviso de eventos futuros (pedido do Arteco): o evento só aparece no menu enquanto está rolando.
+  H.hidden=!A;$('btnEvent').hidden=!A;if(!A)return;
+  const v=S.ev,own=v.own.includes(A.e.id),n=v.p[A.key]||0,W=EVW[A.e.id];
+  H.style.setProperty('--e1',A.e.c1);H.style.setProperty('--e2',A.e.c2);
+  H.innerHTML=`<img src="${EV_ICON[A.e.id]}" alt=""><span class="tx">Evento de ${A.e.n}${A.test?' (teste)':''}!<small>${own?'Você já tem o '+W.n+'. Agora cada '+A.e.item1+' vale gold.':'Junte '+EV_GOAL+' '+A.e.item+' e ganhe o '+W.n+'. Termina '+emDias(A.b,now)+' ('+dm(A.b)+').'}</small>${own?'':`<div class="mbar"><i style="width:${100*n/EV_GOAL}%"></i></div>`}</span>`;
+  $('evBadge').hidden=own;}
+function showEvent(){const now=new Date(),A=evActive(now);if(!A){showHub();return;}
+  const v=S.ev,e=A.e,W=EVW[e.id],own=v.own.includes(e.id),n=v.p[A.key]||0,best=WEAPONS[Math.max(...S.owned)].n;
+  let h=`<div class="evhub" style="--e1:${e.c1};--e2:${e.c2};cursor:default"><img src="${EV_ICON[e.id]}" alt=""><span class="tx">Evento de ${e.n}${A.test?' (teste)':''}<small>Termina ${emDias(A.b,now)} (${dm(A.b)})</small></span></div>`;
+  h+=`<p>${own?'Você já ganhou a arma deste evento. Agora cada '+e.item1+' que cair vale gold.':'Derrote inimigos para juntar '+e.item+': cada chefe dá 10 e na fase difícil cai o dobro. Com '+EV_GOAL+' você ganha a arma especial, que só sai neste evento e fica com você para sempre.'}</p>`;
+  if(!own)h+=`<div><div class="row"><b>${n}/${EV_GOAL} ${e.item}</b><span class="tag">faltam ${EV_GOAL-n}</span></div><div class="mbar" style="height:12px"><i style="width:${100*n/EV_GOAL}%"></i></div></div>`;
   h+=`<div class="card" style="cursor:default"><span class="ic ev"><img src="${W_ICON[e.id]}" alt=""></span><span class="tx"><span class="tag">Arma especial</span><b>${W.n}</b><small>${W.d} A força acompanha a sua melhor arma (agora: ${best}).</small></span><span class="pr">${own?'✓ Sua':''}</span></div>`;
   if(W.gifts)h+=`<div class="els">${GIFT_EL.map(k=>`<div class="el"><img src="${GIFT_ICON[k]}" alt=""><span><b>${EL[k].cor}: ${EL[k].n}</b>${EL[k].d}</span></div>`).join('')}</div>`;
-  $('evMain').innerHTML=h;
-  const L=$('evList');L.innerHTML='';
-  for(const ev of EVENTS){const o=evOcc(ev,now),on=A?A.e===ev:o.on,mine=v.own.includes(ev.id),d=document.createElement('div');d.className='card'+(mine?' done':'');d.style.cursor='default';
-    d.innerHTML=`<span class="ic ev"><img src="${EV_ICON[ev.id]}" alt=""></span><span class="tx"><b>${ev.n}</b><small>${dm(o.a)} a ${dm(o.b)} · ${EVW[ev.id].n}</small></span><span class="pr">${mine?'✓ Sua':on?'Agora':emDias(o.a,now)}</span>`;L.appendChild(d);}
-  $('mStart').hidden=true;$('mEvent').hidden=false;}
+  $('evMain').innerHTML=h;$('mStart').hidden=true;$('mEvent').hidden=false;}
 // Aba Armas: armas especiais que você já ganhou (usam a força da sua melhor arma da escada)
 function armsEv(L){const own=(S.ev&&S.ev.own)||[],eq=evEquipped(),bi=Math.max(...S.owned),now=new Date();
+  const A=evActive(now);if(!own.length&&!A)return; // sem arma especial e sem evento rolando: não mostra nada
   const t=document.createElement('p');t.className='tag';t.textContent='Armas especiais (só saem em eventos)';L.appendChild(t);
-  if(!own.length){const N=evActive(now)||evNextUp(now),p=document.createElement('p');
-    p.textContent=N.on?'O evento de '+N.e.n+' está rolando: junte '+N.e.item+' para ganhar o '+EVW[N.e.id].n+'.':'Próximo evento: '+N.e.n+' ('+emDias(N.a,now)+'), com o '+EVW[N.e.id].n+'.';L.appendChild(p);return;}
+  if(!own.length){const p=document.createElement('p');p.textContent='O evento de '+A.e.n+' está rolando: junte '+A.e.item+' para ganhar o '+EVW[A.e.id].n+'.';L.appendChild(p);return;}
   for(const id of own){const W=EVW[id],b=document.createElement('button');b.className='card';
     b.innerHTML=`<span class="ic ev"><img src="${W_ICON[id]}" alt=""></span><span class="tx"><span class="tag">${EV_BY[id].n}</span><b>${W.n}</b><small>${W.d} Força da sua melhor arma (${WEAPONS[bi].n}).</small></span><span class="pr">${eq===id?'Equipada':'Equipar'}</span>`;
     b.onclick=()=>{S.ev.eq=id;S.baseWeapon=bi;S.weapon=bi;showArms();};L.appendChild(b);}}
