@@ -25,6 +25,10 @@ html,body{height:100%;margin:0;overflow:hidden;background:var(--night);color:var
 .slot.on{background:var(--gold);border:1px solid var(--gold)}
 .slot.extra{border-color:#c58bff}.slot.on.extra{background:#c58bff;border-color:#c58bff}
 #btnPause{pointer-events:auto;background:var(--panel2);color:var(--ink);border:1px solid var(--panel2);border-radius:10px;padding:6px 10px;font:800 13px var(--body)}
+#btnFlShop{pointer-events:auto;background:var(--gold);color:#241a06;border:0;border-radius:10px;padding:6px 10px;font:800 13px var(--body)}
+.bar>i.fl{background:var(--green)}
+.dmg.gn{color:var(--gold);font-size:17px}
+#btnForest img{height:26px;vertical-align:-7px;margin-right:2px}#btnForest small{color:var(--muted);font-weight:700;font-size:13px}
 #btnAttr{pointer-events:auto;background:var(--gold);color:#241a06;border:0;border-radius:10px;padding:6px 10px;font:800 13px var(--body)}
 .modal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(10,14,12,.78);padding:16px max(16px,env(safe-area-inset-right,0px)) 16px max(16px,env(safe-area-inset-left,0px));z-index:5}
 .box{width:100%;max-width:420px;background:var(--panel);border:1px solid var(--panel2);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:12px;max-height:90%;overflow:auto}
@@ -79,8 +83,8 @@ p{margin:0;color:var(--muted);line-height:1.45}
     <span class="pill" id="phase">Fase 1 · Onda 1/5</span>
     <span class="pill gold" id="gold">0 gold</span>
   </div>
-  <div class="row"><div class="bar" style="flex:1"><i id="xp"></i></div><span class="pill" id="lvl">Nv 1</span><button id="btnPause" aria-label="Pausar">II</button></div>
-  <div class="row" style="justify-content:flex-start;align-items:flex-start"><div class="slots" id="slots"></div><span class="pill" id="evPill" hidden></span></div>
+  <div class="row"><div class="bar" style="flex:1"><i id="xp"></i></div><span class="pill" id="lvl">Nv 1</span><button id="btnFlShop" hidden>Loja</button><button id="btnPause" aria-label="Pausar">II</button></div>
+  <div class="row" style="justify-content:flex-start;align-items:flex-start"><div class="slots" id="slots"></div><span class="pill" id="evPill" hidden></span><span class="pill" id="flInfo" hidden></span></div>
   <div class="bar" id="bossbar"><i id="bosshp"></i></div>
 </div>
 <div id="toast"></div>
@@ -94,13 +98,14 @@ p{margin:0;color:var(--muted);line-height:1.45}
   <p>Cada fase começa do zero: nível, cartas e evoluções de arma valem só naquela fase. Você pode escolher até 5 cartas por fase (a evolução de arma também conta); se não gostar das que aparecerem, pule e tente no próximo nível. Depois das 5, cada nível dá sozinho um prêmio sorteado: 5 gold ou +1% num atributo (só naquela fase). O que fica para sempre é o que você compra na Loja: atributos e armas. Se perder, o gold volta ao que era no começo da fase.</p>
   <p id="hubInfo"></p>
   <button class="btn" id="btnStart">Jogar</button>
+  <button class="btn ghost" id="btnForest">Floresta · relaxar</button>
   <button class="btn ghost" id="btnJourney">Jornada</button>
   <button class="btn ghost" id="btnDaily">Missões diárias <span id="dailyBadge" class="badge" hidden>!</span></button>
   <button class="btn ghost" id="btnEvent" hidden>Eventos <span id="evBadge" class="badge" hidden>!</span></button>
   <button class="btn ghost" id="btnArms">Armas</button>
   <button class="btn ghost" id="btnShop">Loja</button>
   <button class="btn ghost" id="btnQuit">Sair</button>
-  <div class="row" id="testBar" hidden style="flex-wrap:wrap;justify-content:center"><button class="btn ghost" id="tPrev">Fase -5</button><button class="btn ghost" id="tNext">Fase +5</button><button class="btn ghost" id="tNext50">Fase +50</button><button class="btn ghost" id="tGold">+1000 gold</button><button class="btn ghost" id="tRare">Moeda rara: 0,819%</button><button class="btn ghost" id="tEv">Evento: automático</button><button class="btn ghost" id="tEvAdd">+50 itens do evento</button></div>
+  <div class="row" id="testBar" hidden style="flex-wrap:wrap;justify-content:center"><button class="btn ghost" id="tPrev">Fase -5</button><button class="btn ghost" id="tNext">Fase +5</button><button class="btn ghost" id="tNext50">Fase +50</button><button class="btn ghost" id="tGold">+1000 gold</button><button class="btn ghost" id="tRare">Moeda rara: 0,819%</button><button class="btn ghost" id="tEv">Evento: automático</button><button class="btn ghost" id="tEvAdd">+50 itens do evento</button><button class="btn ghost" id="tFl">Floresta: sessão +5</button></div>
   <p class="tag" id="verTag">Protótipo · formas simples no lugar da arte</p>
 </div></div>
 <div class="modal" id="mCards" hidden><div class="box">
@@ -232,11 +237,12 @@ const ERAS=[
 ];
 const era=()=>ERAS[Math.min(Math.floor((S.phase-1)/5),ERAS.length-1)];
 // Sons sintetizados (sem arquivos), liberados após o toque em Jogar.
-let AC=null,muted=false,lastShot=0;
+let AC=null,muted=false,lastShot=0,lastChop=0;
 function sfx(k){if(muted||!AC)return;const t=AC.currentTime;
   if(k==='shot'){if(t-lastShot<.09)return;lastShot=t;}
+  if(k==='chop'){if(t-lastChop<.08)return;lastChop=t;}
   const P={shot:[880,440,.05,'square',.03],hit:[220,110,.06,'triangle',.05],kill:[520,180,.12,'sawtooth',.05],hurt:[160,60,.3,'sawtooth',.12],
-    level:[520,1040,.25,'triangle',.08],bonus:[700,1400,.15,'sine',.08],win:[392,784,.5,'triangle',.1],boss:[90,60,.6,'sawtooth',.12]}[k];
+    level:[520,1040,.25,'triangle',.08],chop:[420,170,.07,'triangle',.07],tree:[190,55,.45,'triangle',.13],bonus:[700,1400,.15,'sine',.08],win:[392,784,.5,'triangle',.1],boss:[90,60,.6,'sawtooth',.12]}[k];
   const o=AC.createOscillator(),g=AC.createGain();o.type=P[3];o.frequency.setValueAtTime(P[0],t);o.frequency.exponentialRampToValueAtTime(P[1],t+P[2]);
   g.gain.setValueAtTime(P[4],t);g.gain.exponentialRampToValueAtTime(.0001,t+P[2]);o.connect(g).connect(AC.destination);o.start(t);o.stop(t+P[2]+.02);}
 
@@ -256,7 +262,7 @@ const WEAPONS=[
  {n:'Mísseis teleguiados',d:'Mísseis que perseguem o inimigo e explodem',dmg:14,rate:1.5,ph:175,p:330,shop:16000,col:0xd8e0e8,size:1.8,speed:17,boom:2.2,home:1},
  {n:'Canhão laser',d:'Raio que atravessa tudo na frente',dmg:7,rate:2.4,ph:200,p:360,shop:20000,col:0xff3355,size:1.8,speed:70,pierce:99},
 ];
-function fresh(){return {phase:1,gold:0,xp:0,lvl:1,weapon:0,baseWeapon:0,owned:[0],helper:false,helperOn:false,baby:false,babyOn:false,twin:false,twinOn:false,angel:0,attrs:{dmg:0,atk:0,mov:0,vida:0,xp:0},cards:{},wv:2,ev:{p:{},own:[],eq:null,seen:{}}};}
+function fresh(){return {phase:1,gold:0,xp:0,lvl:1,weapon:0,baseWeapon:0,owned:[0],helper:false,helperOn:false,baby:false,babyOn:false,twin:false,twinOn:false,angel:0,attrs:{dmg:0,atk:0,mov:0,vida:0,xp:0},cards:{},wv:2,ev:{p:{},own:[],eq:null,seen:{}},fl:{sess:1,cut:0,trees:0,gold:0}};}
 const clone=o=>JSON.parse(JSON.stringify(o));
 // Permanente: fase, gold, atributos e arma comprada na Loja. Temporário (só dentro da fase): XP, nível, cartas e evoluções de arma.
 function resetPhaseStuff(){S.lvl=1;S.xp=0;S.cards={};if(evEquipped())S.baseWeapon=Math.max(...(S.owned||[0])); // arma especial usa a melhor arma
@@ -299,7 +305,7 @@ lane.rotation.x=-Math.PI/2; lane.position.set(0,.01,17); scene.add(lane);
 // muralha atrás do jogador
 const wall=new THREE.Mesh(new THREE.BoxGeometry(HALF*2+3,1.6,1),new THREE.MeshLambertMaterial({color:0x8b8574}));
 wall.position.set(0,.8,PZ-1.3); scene.add(wall);
-for(let i=-5;i<=5;i+=2){const m=new THREE.Mesh(new THREE.BoxGeometry(.9,.7,1),wall.material);m.position.set(i,1.95,PZ-1.3);scene.add(m);}
+const crenels=[];for(let i=-5;i<=5;i+=2){const m=new THREE.Mesh(new THREE.BoxGeometry(.9,.7,1),wall.material);m.position.set(i,1.95,PZ-1.3);scene.add(m);crenels.push(m);}
 // Estacas na muralha (carta): faixa perto da muralha onde os inimigos andam mais devagar
 const stakeTex=canvasTex(384,256,(x,w,h)=>{const g=x.createLinearGradient(0,0,0,h);g.addColorStop(0,'rgba(160,110,55,.12)');g.addColorStop(1,'rgba(160,110,55,.30)');x.fillStyle=g;x.fillRect(0,26,w,h-26);
   x.lineWidth=3;x.strokeStyle='#1c120c';x.lineJoin='round';
@@ -658,7 +664,7 @@ function armsEv(L){const own=(S.ev&&S.ev.own)||[],eq=evEquipped(),bi=Math.max(..
     b.onclick=()=>{S.ev.eq=id;S.baseWeapon=bi;S.weapon=bi;showArms();};L.appendChild(b);}}
 
 // ---------- partida ----------
-function clearWorld(){ if(!run) return; [...run.en,...run.ar,...run.bo,...run.fx].forEach(o=>scene.remove(o.m)); }
+function clearWorld(){ if(!run) return; [...run.en,...run.ar,...run.bo,...run.fx,...(run.deco||[])].forEach(o=>scene.remove(o.m)); for(const e of run.en)if(e.bg)scene.remove(e.bg,e.fg); }
 // Fase Difícil: 1 fase surpresa por mapa (a cada 5 fases), sorteada e obrigatória. Só se descobre ao entrar.
 // Inimigos bem mais fortes, rápidos e numerosos; gold x3 e prêmio grande.
 let HARD=false;
@@ -671,7 +677,7 @@ function isHardPhase(p){const k=Math.floor((p-1)/5);if(!S.seed)S.seed=1+(Math.ra
   return p===5*k+lo+Math.floor(h*(6-lo));}
 function hardReward(){return Math.round(120*S.phase*stats().goldm);}
 function startPhase(keep){
-  HARD=isHardPhase(S.phase); stakeM.visible=false;
+  forestLook(false); HARD=isHardPhase(S.phase); stakeM.visible=false;
   const pend=keep&&run?run.pendingLv:0;
   clearWorld();
   resetPhaseStuff();
@@ -727,10 +733,10 @@ function spawn(type,x,z){
 function nearest(x,z){let b=null,bd=1e9;for(const e of run.en){const d=(e.m.position.x-x)**2+(e.m.position.z-z)**2;if(d<bd){bd=d;b=e;}}return b;}
 const wMats={};
 // half=true: tiro do Ajudante (tudo pela metade)
-function shoot(from,dmg,count,gold,half,power){
+function shoot(from,dmg,count,gold,half,power,aim){
   const st=stats(),W=st.W,mat=gold||power?arrowGoldMat:(wMats[W.col]||(wMats[W.col]=new THREE.MeshBasicMaterial({color:W.col})));
   // Sem a carta Mira automática, o tiro sai reto para cima.
-  let ang=0; const tgt=st.mira?nearest(from.x,from.z):null;
+  let ang=0; const tgt=aim||(st.mira?nearest(from.x,from.z):null); // aim: alvo escolhido (árvore na Floresta)
   if(tgt){ang=Math.atan2(tgt.m.position.x-from.x,tgt.m.position.z-from.z);}
   // Escopeta: cada tiro vira vários chumbos bem espalhados.
   const sp=W.spread||.14; if(W.pellets)count=count+W.pellets-1;
@@ -780,7 +786,7 @@ function hitEnemy(e,ar){
     else if(ar.el==='raio'){let n=0;for(const o of run.en){if(o===e||n>=3)continue;if(o.m.position.distanceTo(p)<5){hurt(o,b*.5*hf);lightning(p,o.m.position);n++;}}burst(p,0x9fd8ff,4,5,.5);}
     else if(ar.el==='gelo'){e.slow=2.5;e.slowF=.55;e.chill=2.5;ringFx(p.clone(),0xd8f4ff,.6,2.6,.25);}
     if(ar.split)popcorn(e,ar);
-    if(ar.knock&&!e.T.boss)e.m.position.z=Math.min(SPAWNZ,e.m.position.z+ar.knock*hf);}
+    if(ar.knock&&!e.T.boss&&!e.tree)e.m.position.z=Math.min(SPAWNZ,e.m.position.z+ar.knock*hf);}
   if(st.exec&&!e.T.boss&&e.hp>0&&e.hp<e.max*(.1+.05*st.exec))e.hp=0;
   if(st.push)e.m.position.z=Math.min(SPAWNZ,e.m.position.z+(e.T.boss?.12:(ar.half?.3:.6))*(1+(st.push-1)/3));
   // glitter do bebê: dano fixo, sem cartas nem atributos
@@ -989,15 +995,171 @@ function syncUnits(){const st=stats();
 
 // ---------- controle ----------
 const ZMAX=PZ+10; let targetX=0,targetZ=PZ,drag=null; const keys={};
+const LIM={x0:-HALF,x1:HALF,z0:PZ,z1:ZMAX}; // até onde dá para andar (a Floresta libera a tela toda)
 addEventListener('pointerdown',e=>{if(e.target.closest('.modal,button'))return;drag={x:e.clientX,y:e.clientY,px:player.position.x,pz:player.position.z};});
-addEventListener('pointermove',e=>{if(!drag||paused())return;const w=Math.min(innerWidth,600);targetX=Math.max(-HALF,Math.min(HALF,drag.px-(e.clientX-drag.x)/w*13));targetZ=Math.max(PZ,Math.min(ZMAX,drag.pz-(e.clientY-drag.y)/w*13));});
+addEventListener('pointermove',e=>{if(!drag||paused())return;const w=Math.min(innerWidth,600);targetX=Math.max(LIM.x0,Math.min(LIM.x1,drag.px-(e.clientX-drag.x)/w*13));targetZ=Math.max(LIM.z0,Math.min(LIM.z1,drag.pz-(e.clientY-drag.y)/w*13));});
 addEventListener('pointerup',()=>drag=null); addEventListener('pointercancel',()=>drag=null);
 addEventListener('keydown',e=>keys[e.key.length==1?e.key.toLowerCase():e.key]=1); addEventListener('keyup',e=>keys[e.key.length==1?e.key.toLowerCase():e.key]=0);
+
+// ---------- Floresta (modo relaxante) ----------
+// Ideia do Arteco (2026-11-26): sem monstros, só derrubar árvores. Você anda livre; se não mexer, a arqueira vai sozinha
+// até a árvore mais perto e atira nela. Cada árvore que cai dá gold (vai direto para o seu gold, sem risco de perder).
+// Sessão = derrubar as 10 árvores da clareira. Na sessão seguinte nascem árvores mais duras (+25% de vida) que valem mais gold (+13%).
+// A vida cresce mais rápido que o gold: quanto mais longe, mais vale a pena melhorar Dano e Velocidade de ataque na Loja.
+const FL={trees:10,hp:6,hpG:1.25,gold:12,goldG:1.13,range:7.5,stand:3,auto:.7,x:4.3,z0:7.5,z1:24.5,W:3,H:3.75};
+const flHp=s=>Math.round(FL.hp*FL.hpG**(s-1)), flGold=s=>Math.round(FL.gold*FL.goldG**(s-1));
+const fmtN=n=>{n=Math.round(n);return n<1e4?String(n):n<1e6?(n/1e3).toFixed(n<1e5?1:0).replace('.',',')+' mil':(n/1e6).toFixed(1).replace('.',',')+' mi';};
+// Árvores desenhadas no código, no estilo do jogo (contorno escuro grosso, cores chapadas com luz em cima).
+function flCanvas(draw){const c=document.createElement('canvas');c.width=256;c.height=320;const x=c.getContext('2d');x.lineJoin='round';x.lineCap='round';x.strokeStyle='#1c120c';draw(x);return c;}
+function flShadow(x){x.fillStyle='rgba(0,0,0,.28)';x.beginPath();x.ellipse(128,298,76,15,0,0,7);x.fill();}
+function flTrunk(x,top,c1,c2){x.beginPath();x.moveTo(108,top);x.lineTo(104,262);x.quadraticCurveTo(94,286,76,298);x.lineTo(180,298);x.quadraticCurveTo(162,286,152,262);x.lineTo(148,top);x.closePath();
+  const g=x.createLinearGradient(96,0,160,0);g.addColorStop(0,c1);g.addColorStop(1,c2);x.fillStyle=g;x.fill();x.lineWidth=7;x.stroke();
+  x.lineWidth=3.5;x.beginPath();x.moveTo(120,top+30);x.quadraticCurveTo(115,240,120,276);x.moveTo(137,top+44);x.quadraticCurveTo(142,236,136,270);x.stroke();}
+const CROWN=[[128,150,66],[74,164,46],[182,164,46],[92,104,48],[164,100,50],[128,68,50]];
+function flBlob(x,c1,c2){x.lineWidth=15;for(const [cx,cy,r] of CROWN){x.beginPath();x.arc(cx,cy,r,0,7);x.stroke();} // contorno só por fora
+  for(const [cx,cy,r] of CROWN){const g=x.createRadialGradient(cx-r*.3,cy-r*.45,r*.15,cx,cy,r*1.05);g.addColorStop(0,c1);g.addColorStop(1,c2);x.fillStyle=g;x.beginPath();x.arc(cx,cy,r,0,7);x.fill();}
+  x.fillStyle='rgba(255,255,255,.22)';for(const [cx,cy,rx,ry] of [[100,86,17,10],[152,60,15,9],[70,148,12,8],[176,140,12,7]]){x.beginPath();x.ellipse(cx,cy,rx,ry,-.5,0,7);x.fill();}}
+function flDots(x,P,r,fill,mid){for(const [px,py] of P){x.fillStyle=fill;x.beginPath();x.arc(px,py,r,0,7);x.fill();x.lineWidth=3.5;x.stroke();
+  if(mid){x.fillStyle=mid;x.beginPath();x.arc(px,py,r*.4,0,7);x.fill();}else{x.fillStyle='rgba(255,255,255,.7)';x.beginPath();x.arc(px-r*.35,py-r*.35,r*.3,0,7);x.fill();}}}
+function flTier(x,cx,ty,hw,by){x.beginPath();x.moveTo(cx,ty);x.quadraticCurveTo(cx+hw*.35,ty+(by-ty)*.55,cx+hw,by-6);x.quadraticCurveTo(cx+hw*.5,by+10,cx,by+4);
+  x.quadraticCurveTo(cx-hw*.5,by+10,cx-hw,by-6);x.quadraticCurveTo(cx-hw*.35,ty+(by-ty)*.55,cx,ty);x.closePath();}
+function flPine(x,c1,c2,snow){flTrunk(x,200,'#9a6a40','#5e3b1e');
+  for(const [cx,ty,hw,by] of [[128,96,104,238],[128,52,84,172],[128,12,62,106]]){flTier(x,cx,ty,hw,by);const g=x.createLinearGradient(cx-hw,ty,cx+hw,by);g.addColorStop(0,c1);g.addColorStop(1,c2);x.fillStyle=g;x.fill();
+    if(snow){x.save();flTier(x,cx,ty,hw,by);x.clip();x.fillStyle='#f6fbff';x.beginPath();x.moveTo(cx-hw-12,by+16);x.lineTo(cx+hw+12,by+16);x.lineTo(cx+hw+12,by-20);
+      for(let k=0;k<=10;k++)x.lineTo(cx+hw-k*hw/5,by-20-(k%2?0:11));x.closePath();x.fill();
+      if(ty<20){x.beginPath();x.moveTo(cx-hw,ty-10);x.lineTo(cx+hw,ty-10);x.lineTo(cx+hw,ty+30);for(let k=0;k<=6;k++)x.lineTo(cx+hw-k*hw/3,ty+30+(k%2?10:0));x.closePath();x.fill();}
+      x.fillStyle='rgba(255,255,255,.85)';for(const [px,py] of [[cx-hw*.4,by-40],[cx+hw*.3,by-50],[cx+hw*.05,by-34]]){x.beginPath();x.arc(px,py,4,0,7);x.fill();}x.restore();}
+    flTier(x,cx,ty,hw,by);x.lineWidth=7;x.stroke();}}
+const FL_TYPES=[
+ {n:'Macieiras',leaf:0x7cc56b,c:flCanvas(x=>{flShadow(x);flTrunk(x,180,'#a87445','#6e4524');flBlob(x,'#a6e486','#2f7a3a');flDots(x,[[92,132],[158,126],[118,178],[188,168],[66,184],[142,92],[204,128]],9,'#e2453a');})},
+ {n:'Pinheiros',leaf:0x3f9a5a,c:flCanvas(x=>{flShadow(x);flPine(x,'#62c07c','#1f5a36');})},
+ {n:'Cerejeiras',leaf:0xf6a5c0,c:flCanvas(x=>{flShadow(x);flTrunk(x,180,'#8a5a4a','#56352a');flBlob(x,'#ffe0ec','#d8628f');flDots(x,[[90,128],[150,118],[118,184],[184,172],[62,176],[136,78],[200,134],[104,60]],7,'#fff6fa','#f2c53a');})},
+ {n:'Árvores de outono',leaf:0xf0a040,c:flCanvas(x=>{flShadow(x);flTrunk(x,180,'#9a6a40','#5e3b1e');flBlob(x,'#ffd27a','#c9541c');
+   for(const [px,py,a] of [[26,232,.6],[232,212,-.8],[36,92,-.3],[222,60,.9]]){x.save();x.translate(px,py);x.rotate(a);x.fillStyle='#e8892c';x.beginPath();x.ellipse(0,0,13,7,0,0,7);x.fill();x.lineWidth=3.5;x.stroke();x.restore();}})},
+ {n:'Pinheiros nevados',leaf:0xeaf6ff,c:flCanvas(x=>{flShadow(x);flPine(x,'#5aa88a','#1d4f3e',1);})},
+];
+FL_TYPES.forEach(T=>T.tex=new THREE.CanvasTexture(T.c));
+const FL_ICON=FL_TYPES[0].c.toDataURL();
+const flType=s=>FL_TYPES[(s-1)%FL_TYPES.length];
+const stumpTex=canvasTex(256,160,(x)=>{x.lineJoin='round';x.strokeStyle='#1c120c';
+  x.fillStyle='rgba(0,0,0,.25)';x.beginPath();x.ellipse(128,130,86,20,0,0,7);x.fill();
+  x.fillStyle='#7a4e2a';x.beginPath();x.moveTo(62,70);x.lineTo(56,124);x.quadraticCurveTo(128,148,200,124);x.lineTo(194,70);x.closePath();x.fill();x.lineWidth=7;x.stroke();
+  x.fillStyle='#e8c58a';x.beginPath();x.ellipse(128,70,66,24,0,0,7);x.fill();x.stroke();
+  x.lineWidth=3;x.strokeStyle='#b08850';for(const r of [44,26,10]){x.beginPath();x.ellipse(128,70,r,r*.36,0,0,7);x.stroke();}});
+function flowerTex(pet,mid){return canvasTex(64,64,x=>{x.strokeStyle='#1c120c';x.lineWidth=3;x.fillStyle=pet;
+  for(let i=0;i<5;i++){const a=i*1.2566;x.beginPath();x.arc(32+Math.sin(a)*12,32-Math.cos(a)*12,9,0,7);x.fill();x.stroke();}x.fillStyle=mid;x.beginPath();x.arc(32,32,8,0,7);x.fill();x.stroke();});}
+const FL_DECO=[canvasTex(64,64,x=>{x.lineJoin='round';x.strokeStyle='#14261a';x.lineWidth=4;x.fillStyle='#5fae4a';
+    for(const [a,h] of [[-.5,40],[0,50],[.45,38]]){x.save();x.translate(32,60);x.rotate(a);x.beginPath();x.moveTo(-6,0);x.quadraticCurveTo(-3,-h*.6,0,-h);x.quadraticCurveTo(3,-h*.6,6,0);x.closePath();x.fill();x.stroke();x.restore();}}),
+  flowerTex('#fff6e8','#f2c53a'),flowerTex('#ffd0e0','#f08a2c'),flowerTex('#bfe3ff','#fff6e8')];
+const barTex=canvasTex(64,16,(x)=>{x.fillStyle='#fff';x.beginPath();x.roundRect?x.roundRect(0,0,64,16,8):x.rect(0,0,64,16);x.fill();});
+function forestLook(on){lane.visible=wall.visible=!on;for(const m of crenels)m.visible=!on;
+  if(on){stakeM.visible=false;ground.material.color.setHex(0x3f7a3a);Object.assign(LIM,{x0:-HALF-.4,x1:HALF+.4,z0:1.4,z1:FL.z1});}
+  else Object.assign(LIM,{x0:-HALF,x1:HALF,z0:PZ,z1:ZMAX});
+  $('hearts').hidden=on;$('slots').hidden=on;$('btnFlShop').hidden=!on;$('flInfo').hidden=!on;if(on)$('evPill').hidden=true;$('xp').classList.toggle('fl',on);$('bossbar').style.display='none';}
+function flNear(x,z){let b=null,bd=1e9;for(const e of run.en){if(e.delay>0)continue;const d=(e.m.position.x-x)**2+(e.m.position.z-z)**2;if(d<bd){bd=d;b=e;}}return b;}
+function flPlace(n){const pts=[],P=player.position;let tries=0,gap=2.9;
+  while(pts.length<n&&tries<4000){tries++;if(tries%600===0)gap*=.9;const x=(Math.random()*2-1)*FL.x,z=FL.z0+Math.random()*(FL.z1-FL.z0);
+    if(pts.some(q=>(q.x-x)**2+(q.z-z)**2<gap*gap)||(P.x-x)**2+(P.z-z)**2<12)continue;pts.push({x,z});}
+  return pts;}
+function flSpawn(x,z,i){const K=flType(run.sess),m=mkSprite(K.tex,.01,.01,.55+(31-z)*.02);m.position.x=x;m.position.z=z;scene.add(m); // mais embaixo na tela = desenhada por cima
+  const hp=flHp(run.sess),bg=mkSprite(barTex,2.2,.32,2.6),fg=mkSprite(barTex,2.1,.2,2.7);
+  bg.material.color.setHex(0x1c120c);bg.material.opacity=.85;fg.center.set(0,.5);bg.visible=fg.visible=false;scene.add(bg,fg);
+  const e={m,tree:1,kind:K,type:'arvore',T:{},hp,max:hp,r:1.15,s:FL.W,bg,fg,hitT:0,flash:0,burn:0,burnD:0,pois:0,poisD:0,slow:0,chill:0,wp:Math.random()*6,grow:0,delay:(i||0)*.08};
+  run.en.push(e);return e;}
+function startForest(){try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();AC.resume();}catch(_){}
+  $('mStart').hidden=true;clearWorld();resetPhaseStuff();HARD=false;
+  const F=S.fl=Object.assign({sess:1,cut:0,trees:0,gold:0},S.fl||{});if(F.cut>=FL.trees){F.sess++;F.cut=0;}
+  run={fl:1,t:0,en:[],ar:[],bo:[],fx:[],deco:[],fireT:0,helpT:0,babyT:1,twinT:1.6,idle:FL.auto,sess:F.sess,cut:F.cut,nextT:0,done:false,bon:{},pendingLv:0,earned:0};
+  forestLook(true);player.position.set(0,0,2.6);targetX=0;targetZ=2.6;
+  for(let i=0;i<24;i++){const k=.7+Math.random()*.45,m=mkSprite(FL_DECO[i%FL_DECO.length],k,k,.25);m.material.depthWrite=false; // grama e flores
+    m.position.x=(Math.random()*2-1)*5.6;m.position.z=.5+Math.random()*26;scene.add(m);run.deco.push({m});}
+  const mk=mkSprite(ringTex,2.6,1.3,.35);mk.material.color.setHex(0xffd86a);mk.material.opacity=.8;mk.material.depthWrite=false;mk.visible=false;scene.add(mk);run.mark=mk;run.deco.push({m:mk});
+  syncUnits();flPlace(FL.trees-run.cut).forEach((q,i)=>flSpawn(q.x,q.z,i));
+  hud();toast('Floresta · Sessão '+run.sess);
+  if(!F.seen){F.seen=1;save();msg('Floresta','Modo relaxante: aqui não tem monstros. A arqueira atira nas árvores e, se você não mexer, ela vai sozinha até a árvore mais perto. Cada árvore que cai dá gold. Derrubou todas, começa uma sessão nova: árvores mais duras, que valem mais gold. A Loja abre daqui mesmo.',null);}}
+function exitForest(){$('mPause').hidden=true;clearWorld();run=null;save();showHub();}
+function flNewSession(){for(const d of run.deco)if(d.stump)scene.remove(d.m);run.deco=run.deco.filter(d=>!d.stump);
+  run.sess=S.fl.sess;run.cut=0;flPlace(FL.trees).forEach((q,i)=>flSpawn(q.x,q.z,i));
+  toast('Sessão '+run.sess+': '+flType(run.sess).n);sfx('level');}
+function flGoldNum(p,g){const [x,y]=scr(p),el=document.createElement('div');el.className='dmg gn';el.textContent='+'+fmtN(g)+' gold';
+  el.style.left=x+'px';el.style.top=(y-34)+'px';$('fxl').appendChild(el);setTimeout(()=>el.remove(),650);}
+function flFell(e){const p=e.m.position.clone(),K=e.kind,g=flGold(run.sess),dir=p.x>player.position.x?1:-1; // cai para longe da arqueira
+  scene.remove(e.m,e.bg,e.fg);run.en.splice(run.en.indexOf(e),1);
+  const f=fxSprite(K.tex,p,FL.W,0xffffff,.8,(f)=>{const k=1-Math.max(0,f.life/f.max);f.m.material.rotation=dir*1.5*k*k;f.m.material.opacity=k<.7?1:1-(k-.7)/.3;});
+  if(f){f.m.scale.set(FL.W,FL.H,1);f.m.center.set(.5,.07);f.m.position.z=p.z-FL.H/2+FL.H*.07;} // gira pela base do tronco
+  const sm=mkSprite(stumpTex,1.7,1.06,.45);sm.position.x=p.x;sm.position.z=p.z-FL.H/2+.5;scene.add(sm);run.deco.push({m:sm,stump:1});
+  burst(p,K.leaf,14,6,.8);burst(sm.position,0xc89a5a,7,4,.5);shake(.15);sfx('tree');
+  addGold(g);coinFly(p,Math.min(7,2+Math.floor(run.sess/4)));flGoldNum(p,g);
+  const F=S.fl;run.cut++;F.cut=run.cut;F.trees=(F.trees||0)+1;F.gold=(F.gold||0)+g;
+  if(run.cut>=FL.trees){F.sess++;F.cut=0;run.nextT=2.2;toast('Floresta limpa!');sfx('win');lvBurst();}
+  save();}
+function stepForest(dt){const st=stats(),P=player.position;run.t+=dt;
+  for(const t of TREES)t.material.rotation=Math.sin(run.t*1.3+t.userData.p)*.06;
+  for(const mm of SPIN)mm.rotation+=dt*mm.userData.sp;
+  // controle: arrastar ou teclado mandam; parada por um instante, ela vai sozinha até a árvore mais perto
+  const kx=(keys.ArrowLeft||keys.a?1:0)-(keys.ArrowRight||keys.d?1:0),kz=(keys.ArrowUp||keys.w?1:0)-(keys.ArrowDown||keys.s?1:0);
+  if(kx||kz){targetX=Math.max(LIM.x0,Math.min(LIM.x1,targetX+kx*st.mov*dt));targetZ=Math.max(LIM.z0,Math.min(LIM.z1,targetZ+kz*st.mov*dt));}
+  run.idle=drag||kx||kz?0:run.idle+dt;
+  const near=flNear(P.x,P.z),nd=near?Math.hypot(near.m.position.x-P.x,near.m.position.z-P.z):1e9,inR=!!near&&nd<FL.range;
+  if(run.idle>=FL.auto){if(near&&(nd>FL.stand+.25||nd<FL.stand-1)){const p=near.m.position;let dx=P.x-p.x,dz=P.z-p.z,d=Math.hypot(dx,dz);if(d<.01){dx=0;dz=-1;d=1;}
+      targetX=Math.max(LIM.x0,Math.min(LIM.x1,p.x+dx/d*FL.stand));targetZ=Math.max(LIM.z0,Math.min(LIM.z1,p.z+dz/d*FL.stand));}
+    else{targetX=P.x;targetZ=P.z;}}
+  {const dx=targetX-P.x,dz=targetZ-P.z,dl=Math.hypot(dx,dz),mv=Math.min(dl,st.mov*dt);if(dl>1e-4){P.x+=dx/dl*mv;P.z+=dz/dl*mv;}}
+  if(baby){baby.position.set(Math.max(-HALF,Math.min(HALF,P.x+(P.x<-2?1.3:-1.3))),0,P.z+.2);baby.userData.ph+=dt*5;baby.userData.spr.position.z=Math.abs(Math.sin(baby.userData.ph))*.15;}
+  if(twin){twin.position.set(Math.max(-HALF-.6,Math.min(HALF+.6,P.x+(P.x<-2?2.4:-2.4))),0,P.z+.1);twin.userData.ph+=dt*5;twin.userData.spr.position.z=Math.abs(Math.sin(twin.userData.ph))*.15;}
+  if(helper)helper.position.set(Math.max(-HALF,Math.min(HALF,P.x+(P.x>2?-1.3:1.3))),0,P.z+.2);
+  animArcher(player,dt);animArcher(helper,dt);
+  // tiros: na árvore mais perto que estiver no alcance
+  run.fireT-=dt;if(inR&&run.fireT<=0){run.fireT=1/st.rate;shoot(P,st.dmg,st.shots,false,false,false,near);archerShoot(player);}
+  if(helper){run.helpT-=dt;const h=helper.position,hn=flNear(h.x,h.z);
+    if(hn&&run.helpT<=0&&Math.hypot(hn.m.position.x-h.x,hn.m.position.z-h.z)<FL.range){run.helpT=1/st.rate;shoot(h,st.dmg*.5,Math.max(1,Math.floor(st.shots/2)),false,true,false,hn);archerShoot(helper);}}
+  if(baby){run.babyT-=dt;if(inR&&run.babyT<=0){run.babyT=BABY.every;throwGlitter(baby.position,BABY);}}
+  if(twin){run.twinT-=dt;if(inR&&run.twinT<=0){run.twinT=TWIN.every;throwGlitter(twin.position,TWIN);}}
+  for(const a of [...run.ar]){
+    if(a.life!=null){a.life-=dt;if(a.life<=0){scene.remove(a.m);run.ar.splice(run.ar.indexOf(a),1);continue;}}
+    if(a.flap)a.m.scale.x=a.s0*(.72+.28*Math.abs(Math.sin(run.t*14+a.ph)));
+    if(a.home){const t=flNear(a.m.position.x,a.m.position.z);if(t){const sp=Math.hypot(a.vx,a.vz),dx=t.m.position.x-a.m.position.x,dz=t.m.position.z-a.m.position.z,d=Math.hypot(dx,dz)||1,k=Math.min(1,dt*5);
+      a.vx+=(dx/d*sp-a.vx)*k;a.vz+=(dz/d*sp-a.vz)*k;const n=Math.hypot(a.vx,a.vz)||1;a.vx*=sp/n;a.vz*=sp/n;a.m.rotation.y=Math.atan2(a.vx,a.vz);}}
+    const q=a.m.position,ox=q.x,oz=q.z;q.x+=a.vx*dt;q.z+=a.vz*dt;const sx=q.x-ox,sz=q.z-oz,sl=sx*sx+sz*sz||1e-9;
+    if(q.z>FL.z1+8||q.z<-3||Math.abs(q.x)>HALF+4){scene.remove(a.m);run.ar.splice(run.ar.indexOf(a),1);continue;}
+    for(const e of run.en){if(a.hit.has(e)||e.delay>0)continue;const p=e.m.position,k=Math.max(0,Math.min(1,((p.x-ox)*sx+(p.z-oz)*sz)/sl));
+      if((p.x-ox-sx*k)**2+(p.z-oz-sz*k)**2<(e.r+.3+.45*(a.big||0))**2){a.hit.add(e);hitEnemy(e,a);sfx('chop');if(Math.random()<.5)burst(p,e.kind.leaf,2,4,.45);
+        if(a.hop>0&&hopTo(a,e))break;
+        if(a.pierce--<=0){scene.remove(a.m);run.ar.splice(run.ar.indexOf(a),1);break;}}}}
+  // árvores: nascem crescendo, tremem quando levam tiro, fogo/veneno continuam tirando vida
+  for(const e of [...run.en]){
+    if(e.delay>0){e.delay-=dt;continue;}
+    if(e.grow<1)e.grow=Math.min(1,e.grow+dt/.55);
+    if(e.burn>0){const t=Math.min(dt,e.burn);e.burn-=dt;e.hp-=e.burnD*t;}
+    if(e.pois>0){const t=Math.min(dt,e.pois);e.pois-=dt;e.hp-=e.poisD*t;}
+    if(e.slow>0)e.slow-=dt;if(e.chill>0)e.chill-=dt;if(e.flash>0)e.flash-=dt;if(e.hitT>0)e.hitT-=dt;
+    tint(e,e.flash>0?0xffe2bc:e.pois>0?0xc4ffa8:e.burn>0?0xffbe80:e.chill>0?0xd8f2ff:0xffffff);
+    if(e.hp<=0){flFell(e);continue;}
+    const g=e.grow<1?Math.max(.01,backOut(e.grow)):1,h=e.hitT>0?e.hitT/.15:0,p=e.m.position;
+    e.m.material.rotation=Math.sin(run.t*1.2+e.wp)*.025+Math.sin(run.t*55+e.wp)*.07*h;
+    e.m.scale.set(FL.W*g*(1+.06*h),FL.H*g*(1-.05*h),1);
+    const show=e.hp<e.max;e.bg.visible=e.fg.visible=show;
+    if(show){const f=Math.max(0,e.hp/e.max),zt=p.z+FL.H/2+.2;e.bg.position.set(p.x,2.6,zt);e.fg.position.set(p.x+1.05,2.7,zt);e.fg.scale.x=Math.max(.001,2.1*f);
+      e.fg.material.color.setHex(f>.5?0x7cc56b:f>.25?0xe8b14a:0xe2574c);}}
+  if(run.mark){run.mark.visible=inR;if(inR){const p=near.m.position,k=1+.06*Math.sin(run.t*6);run.mark.position.set(p.x,.35,p.z-FL.H/2+.45);run.mark.scale.set(2.6*k,1.3*k,1);}}
+  if(run.nextT>0){run.nextT-=dt;if(run.nextT<=0)flNewSession();}
+  for(const f of [...run.fx]){f.life-=dt;if(f.upd)f.upd(f,dt);if(f.life<=0){scene.remove(f.m);if(f.own)f.m.material.dispose();run.fx.splice(run.fx.indexOf(f),1);}}
+}
+function hudForest(){const s=run.sess;$('phase').textContent='Floresta · Sessão '+s;$('gold').textContent=S.gold+' gold';
+  $('lvl').textContent=run.cut+'/'+FL.trees+' árvores';$('xp').style.width=(100*run.cut/FL.trees)+'%';
+  const k=s+'|'+run.cut;if(run.infoK!==k){run.infoK=k;$('flInfo').textContent='Árvore: '+fmtN(flHp(s))+' de vida · '+fmtN(flGold(s))+' gold';}}
+const flPauseText=()=>'Floresta · Sessão '+run.sess+' · '+run.cut+'/'+FL.trees+' árvores · '+stats().W.n+' · '+S.gold+' gold. Árvores derrubadas: '+(S.fl.trees||0)+' · gold ganho na floresta: '+fmtN(S.fl.gold||0)+'.';
+function flHubDraw(){const F=S.fl||{sess:1};$('btnForest').innerHTML='<img src="'+FL_ICON+'" alt=""> Floresta · relaxar <small>sessão '+F.sess+'</small>';}
+$('btnForest').onclick=startForest;
+addEventListener('pointerdown',()=>{try{if(AC&&AC.state==='suspended')AC.resume();}catch(_){}});
+$('btnFlShop').onclick=()=>{if(run&&run.fl&&!paused())showAttrs();};
+$('tFl').onclick=()=>{S.fl.sess+=5;S.fl.cut=0;showHub();};
 
 // ---------- loop ----------
 let last=performance.now();
 function paused(){return !$('mArms').hidden||!$('mDaily').hidden||!$('mEvent').hidden||!$('mJourney').hidden||!$('mPause').hidden||!$('mCards').hidden||!$('mAttr').hidden||!$('mMsg').hidden||!$('mStart').hidden;}
 function step(dt){
+  if(run.fl){stepForest(dt);return;}
   const st=stats(); run.t+=dt;
   if(run.lvT>0){run.lvT-=dt;if(run.lvT<=0&&run.pendingLv&&!paused())showCards();}
   for(const t of TREES)t.material.rotation=Math.sin(run.t*1.3+t.userData.p)*.06;
@@ -1110,7 +1272,7 @@ function drawSlots(){const own=ownedCards(),ev=evoCount(),k=own.map(c=>c.id).joi
   const it=own.map(c=>[c.ic,c.n]);for(let i=0;i<ev;i++)it.push(['★','Evolução de arma']);
   let h='<span class="slotlbl">Cartas</span>';const mx=maxSlots();for(let i=0;i<mx;i++){const c=it[i],x=i>=MAX_SLOTS?' extra':'';h+=c?`<span class="slot on${x}" title="${c[1]}">${c[0]}</span>`:`<span class="slot${x}"></span>`;}
   $('slots').innerHTML=h;}
-function hud(){const st=stats();drawSlots();
+function hud(){if(run.fl){hudForest();return;}const st=stats();drawSlots();
   $('hearts').textContent='♥'.repeat(Math.max(0,run.hp))+'♡'.repeat(Math.max(0,st.maxH-run.hp));
   $('phase').textContent=run.bossSpawned?'Fase '+S.phase+(HARD?' 🔥':'')+' · Chefe':'Fase '+S.phase+(HARD?' 🔥':'')+' · Onda '+run.wave+'/'+(HARD?HARD_WAVES:5);
   $('gold').textContent=S.gold+' gold'; $('lvl').textContent='Nv '+S.lvl+' · '+st.W.n;
@@ -1178,6 +1340,7 @@ function showAttrs(){const L=$('attrList');L.innerHTML='';$('attrGold').textCont
   $('mAttr').hidden=false;}
 
 function openPause(){if(!run||run.done||paused())return;
+  $('pRestart').hidden=!!run.fl; if(run.fl){$('pauseInfo').textContent=flPauseText();$('pSound').textContent='Som: '+(muted?'desligado':'ligado');$('mPause').hidden=false;return;}
   $('pauseInfo').textContent='Fase '+S.phase+' ('+era().n+') · Nível '+S.lvl+' · '+stats().W.n+' · '+S.gold+' gold';
   $('pSound').textContent='Som: '+(muted?'desligado':'ligado'); $('mPause').hidden=false;}
 $('btnPause').onclick=openPause;
@@ -1186,7 +1349,7 @@ $('pResume').onclick=()=>{$('mPause').hidden=true;};
 $('pSound').onclick=()=>{muted=!muted;$('pSound').textContent='Som: '+(muted?'desligado':'ligado');try{localStorage.setItem('arqueiro-som',muted?'0':'1');}catch(_){}};
 try{if(localStorage.getItem('arqueiro-som')==='0'){muted=true;$('pSound').textContent='Som: desligado';}}catch(_){}
 $('pRestart').onclick=()=>{$('mPause').hidden=true;$('mCards').hidden=true;const k=keepHalf();startPhase();if(k)toast('+'+k+' gold guardado');};
-$('pMenu').onclick=()=>{$('mPause').hidden=true;$('mCards').hidden=true;keepHalf();clearWorld();run=null;carry=false;showHub();};
+$('pMenu').onclick=()=>{if(run&&run.fl){exitForest();return;}$('mPause').hidden=true;$('mCards').hidden=true;keepHalf();clearWorld();run=null;carry=false;showHub();};
 let carry=false;
 // Progresso salvo neste aparelho: sair e voltar continua de onde parou.
 const SAVE='arqueiro-save-v1';
@@ -1195,7 +1358,7 @@ function load(){try{const v=JSON.parse(localStorage.getItem(SAVE));if(!v||!v.att
   if(!v.wv){const up=i=>i>=3?i+1:i;v.owned=(v.owned||[0]).map(up);v.baseWeapon=up(v.baseWeapon||0);v.weapon=up(v.weapon||0);v.wv=2;} // Escopeta entrou no índice 3
   return Object.assign(fresh(),v);}catch(_){return null;}}
 function showHub(){resetPhaseStuff();ensureDaily();save();$('dailyBadge').hidden=!dailyClaimable();$('testBar').hidden=location.hash!=='#teste';$('hubInfo').textContent='Fase '+S.phase+' ('+era().n+') · '+stats().W.n+' · '+S.gold+' gold · recorde: fase '+(S.best||0);
-  $('btnStart').textContent='Jogar fase '+S.phase; evHubDraw(); $('mStart').hidden=false; maybeUpdate();}
+  $('btnStart').textContent='Jogar fase '+S.phase; evHubDraw(); flHubDraw(); $('mStart').hidden=false; maybeUpdate();}
 $('btnShop').onclick=showAttrs;
 function showArms(){const L=$('armsList');L.innerHTML='';S.owned=S.owned||[0];
   const evq=evEquipped();
@@ -1229,7 +1392,7 @@ $('tEv').onclick=()=>{const ids=[null,...EVENTS.map(e=>e.id)];testEv=ids[(ids.in
 $('tEvAdd').onclick=()=>{const A=evActive();if(!A){$('tEvAdd').textContent='Sem evento agora';return;}evGain(A,50,null);showHub();};
 $('btnQuit').onclick=()=>{save();$('mQuit').hidden=false;try{window.close();}catch(_){}};
 $('btnQuitBack').onclick=()=>{$('mQuit').hidden=true;};
-$('btnAttrClose').onclick=()=>{$('mAttr').hidden=true;if(!$('mStart').hidden)showHub();};
+$('btnAttrClose').onclick=()=>{$('mAttr').hidden=true;if(!$('mStart').hidden)showHub();else if(run&&run.fl){syncUnits();save();}};
 let msgCb=null; function msg(t,x,cb){$('msgTitle').textContent=t;$('msgText').textContent=x;msgCb=cb;$('mMsg').hidden=false;}
 $('btnMsg').onclick=()=>{$('mMsg').hidden=true;const c=msgCb;msgCb=null;c&&c();};
 $('btnStart').onclick=()=>{try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();AC.resume();}catch(_){}$('mStart').hidden=true;startPhase(false);carry=false;if(run.pendingLv)showCards();};
@@ -1242,14 +1405,17 @@ $('heroImg').src=archerCanvas('front',PAL_MAIN).toDataURL();
 // ---------- Atualização automática ----------
 // No site, cada publicação grava version.json com a versão nova. O jogo confere a cada minuto e quando você volta para a aba.
 // Se tiver versão nova, recarrega sozinho quando estiver no menu (nunca no meio da fase). O progresso fica salvo.
-const BUILD='1e56451374',BUILD_DATE='26/11 18:17'; // trocados na hora de publicar no site
+const BUILD='c9e8d8d635',BUILD_DATE='26/11 19:34'; // trocados na hora de publicar no site
 let updWant=null,updGoing=false;
-function menuLivre(){return !$('mStart').hidden&&(!run||run.done)&&['mCards','mAttr','mQuit','mJourney','mDaily','mEvent','mArms','mPause','mMsg'].every(id=>$(id).hidden);}
+function menuLivre(){const semJanela=['mCards','mAttr','mQuit','mJourney','mDaily','mEvent','mArms','mPause','mMsg'].every(id=>$(id).hidden);
+  if(run&&run.fl)return semJanela&&$('mStart').hidden; // na Floresta pode: tudo fica salvo a cada árvore, e o jogo volta direto para ela
+  return !$('mStart').hidden&&(!run||run.done)&&semJanela;}
 function maybeUpdate(){if(!updWant||updGoing||!menuLivre())return;updGoing=true;save();
   try{sessionStorage.setItem('arqueiro-upd',updWant+'|'+Date.now());}catch(_){}
   $('upd').hidden=false;
   setTimeout(()=>{if(!menuLivre()){updGoing=false;$('upd').hidden=true;return;} // apertou Jogar nesse meio tempo: espera voltar ao menu
-    save();location.replace(location.pathname+'?v='+encodeURIComponent(updWant)+location.hash);},900);}
+    save();try{if(run&&run.fl)sessionStorage.setItem('arqueiro-volta','floresta');}catch(_){}
+    location.replace(location.pathname+'?v='+encodeURIComponent(updWant)+location.hash);},900);}
 async function checkUpdate(){if(BUILD==='dev'||updWant||document.hidden)return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const j=await r.json();
     if(!j||!j.v||j.v===BUILD)return;let tried='';try{tried=sessionStorage.getItem('arqueiro-upd')||'';}catch(_){}
@@ -1262,6 +1428,7 @@ addEventListener('pageshow',e=>{if(e.persisted)checkUpdate();});
 if(BUILD_DATE)$('verTag').textContent+=' · versão de '+BUILD_DATE;
 if(BUILD!=='dev'&&/[?&]v=/.test(location.search))try{history.replaceState(null,'',location.pathname+location.hash);}catch(_){} // tira o ?v= do endereço
 S=load()||fresh(); showHub(); requestAnimationFrame(frame);
+try{if(sessionStorage.getItem('arqueiro-volta')==='floresta'){sessionStorage.removeItem('arqueiro-volta');startForest();}}catch(_){} // atualizou no meio da Floresta: continua nela
 })();
 </script>
 </html>
