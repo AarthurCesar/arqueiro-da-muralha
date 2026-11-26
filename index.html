@@ -31,7 +31,7 @@ html,body{height:100%;margin:0;overflow:hidden;background:var(--night);color:var
 h1,h2{font-family:var(--display);margin:0;text-wrap:balance;color:var(--gold)}
 h1{font-size:30px;text-align:center}h2{font-size:21px}
 p{margin:0;color:var(--muted);line-height:1.45}
-.card{display:flex;gap:10px;align-items:center;background:var(--panel2);border:2px solid transparent;border-radius:12px;padding:10px;cursor:pointer;text-align:left;color:var(--ink);font:inherit;width:100%}
+.card{box-sizing:border-box;display:flex;gap:10px;align-items:center;background:var(--panel2);border:2px solid transparent;border-radius:12px;padding:10px;cursor:pointer;text-align:left;color:var(--ink);font:inherit;width:100%}
 .card:focus-visible,.btn:focus-visible{outline:2px solid var(--gold)}
 .card.off{opacity:.45;cursor:not-allowed}
 .card .ic{font-family:var(--display);width:42px;height:42px;flex:none;border-radius:10px;display:grid;place-items:center;font-size:18px;color:#1a1306;background:var(--gold)}
@@ -57,6 +57,17 @@ p{margin:0;color:var(--muted);line-height:1.45}
 .hearts,.pill{display:inline-block}
 .bump{animation:bump .25s}
 @keyframes bump{50%{transform:scale(1.25)}}
+/* Eventos especiais */
+.evhub{display:flex;gap:10px;align-items:center;width:100%;box-sizing:border-box;text-align:left;border:0;border-radius:12px;padding:10px 12px;cursor:pointer;color:#fff;font:800 15px var(--body);background:linear-gradient(120deg,var(--e1),var(--e2));box-shadow:inset 0 0 0 2px rgba(255,255,255,.2);text-shadow:0 1px 2px rgba(0,0,0,.6)}
+.evhub img{width:46px;height:46px;flex:none;filter:drop-shadow(0 2px 2px rgba(0,0,0,.45))}
+.evhub .tx{flex:1;min-width:0}.evhub small{display:block;font-weight:700;font-size:13px;opacity:.95;margin-top:2px}
+.evhub .mbar{background:rgba(0,0,0,.32)}.evhub .mbar>i{background:#fff}
+.evhub.off{background:var(--panel2);text-shadow:none;color:var(--ink);box-shadow:none}.evhub.off small{color:var(--muted)}
+#evPill{display:inline-flex;align-items:center;gap:4px;padding:2px 9px 2px 4px}#evPill img{width:20px;height:20px}
+.evfly{position:absolute;width:26px;height:26px;transform:translate(-50%,-50%);transition:left .6s cubic-bezier(.5,0,.8,.4),top .6s cubic-bezier(.4,-.4,.8,.6);pointer-events:none;filter:drop-shadow(0 2px 2px rgba(0,0,0,.5))}
+.els{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.el{display:flex;gap:6px;align-items:center;background:var(--panel2);border-radius:10px;padding:6px 8px;font-size:12px;color:var(--muted);line-height:1.25}.el img{width:32px;height:32px;flex:none}.el b{display:block;font-size:13px;color:var(--ink)}
+.card .ic.ev{background:var(--night)}.card .ic img{width:36px;height:36px}
 @media (prefers-reduced-motion:reduce){.bar>i{transition:none}}
 </style>
 
@@ -69,7 +80,7 @@ p{margin:0;color:var(--muted);line-height:1.45}
     <span class="pill gold" id="gold">0 gold</span>
   </div>
   <div class="row"><div class="bar" style="flex:1"><i id="xp"></i></div><span class="pill" id="lvl">Nv 1</span><button id="btnPause" aria-label="Pausar">II</button></div>
-  <div class="slots" id="slots"></div>
+  <div class="row" style="justify-content:flex-start;align-items:flex-start"><div class="slots" id="slots"></div><span class="pill" id="evPill" hidden></span></div>
   <div class="bar" id="bossbar"><i id="bosshp"></i></div>
 </div>
 <div id="toast"></div>
@@ -77,16 +88,18 @@ p{margin:0;color:var(--muted);line-height:1.45}
 <div class="modal" id="mStart"><div class="box">
   <img id="heroImg" alt="" style="display:block;margin:0 auto -6px;height:150px">
   <h1>Arqueiro da Muralha</h1>
+  <button class="evhub" id="evHub" hidden></button>
   <p>Arraste o dedo (ou use WASD / setas) para mover o arqueiro em qualquer direção. O arqueiro atira sozinho. Não deixe os monstros chegarem até você.</p>
   <p>Cada fase começa do zero: nível, cartas e evoluções de arma valem só naquela fase. Você pode escolher até 5 cartas por fase (a evolução de arma também conta); se não gostar das que aparecerem, pule e tente no próximo nível. Depois das 5, cada nível dá sozinho um prêmio sorteado: 5 gold ou +1% num atributo (só naquela fase). O que fica para sempre é o que você compra na Loja: atributos e armas. Se perder, o gold volta ao que era no começo da fase.</p>
   <p id="hubInfo"></p>
   <button class="btn" id="btnStart">Jogar</button>
   <button class="btn ghost" id="btnJourney">Jornada</button>
   <button class="btn ghost" id="btnDaily">Missões diárias <span id="dailyBadge" class="badge" hidden>!</span></button>
+  <button class="btn ghost" id="btnEvent">Eventos <span id="evBadge" class="badge" hidden>!</span></button>
   <button class="btn ghost" id="btnArms">Armas</button>
   <button class="btn ghost" id="btnShop">Loja</button>
   <button class="btn ghost" id="btnQuit">Sair</button>
-  <div class="row" id="testBar" hidden><button class="btn ghost" id="tPrev">Fase -5</button><button class="btn ghost" id="tNext">Fase +5</button><button class="btn ghost" id="tNext50">Fase +50</button><button class="btn ghost" id="tGold">+1000 gold</button><button class="btn ghost" id="tRare">Moeda rara: 0,819%</button></div>
+  <div class="row" id="testBar" hidden style="flex-wrap:wrap;justify-content:center"><button class="btn ghost" id="tPrev">Fase -5</button><button class="btn ghost" id="tNext">Fase +5</button><button class="btn ghost" id="tNext50">Fase +50</button><button class="btn ghost" id="tGold">+1000 gold</button><button class="btn ghost" id="tRare">Moeda rara: 0,819%</button><button class="btn ghost" id="tEv">Evento: automático</button><button class="btn ghost" id="tEvAdd">+50 itens do evento</button></div>
   <p class="tag">Protótipo · formas simples no lugar da arte</p>
 </div></div>
 <div class="modal" id="mCards" hidden><div class="box">
@@ -121,6 +134,13 @@ p{margin:0;color:var(--muted);line-height:1.45}
   <p id="dailyInfo"></p>
   <div id="dailyList" style="display:flex;flex-direction:column;gap:8px"></div>
   <button class="btn" id="btnDailyClose">Voltar ao menu</button>
+</div></div>
+<div class="modal" id="mEvent" hidden><div class="box">
+  <h2>Eventos</h2>
+  <div id="evMain" style="display:flex;flex-direction:column;gap:10px"></div>
+  <p class="tag">Calendário (todo ano)</p>
+  <div id="evList" style="display:flex;flex-direction:column;gap:8px"></div>
+  <button class="btn" id="btnEventClose">Voltar ao menu</button>
 </div></div>
 <div class="modal" id="mArms" hidden><div class="box">
   <h2>Armas</h2>
@@ -237,12 +257,13 @@ const WEAPONS=[
  {n:'Mísseis teleguiados',d:'Mísseis que perseguem o inimigo e explodem',dmg:14,rate:1.5,ph:175,p:330,shop:16000,col:0xd8e0e8,size:1.8,speed:17,boom:2.2,home:1},
  {n:'Canhão laser',d:'Raio que atravessa tudo na frente',dmg:7,rate:2.4,ph:200,p:360,shop:20000,col:0xff3355,size:1.8,speed:70,pierce:99},
 ];
-function fresh(){return {phase:1,gold:0,xp:0,lvl:1,weapon:0,baseWeapon:0,owned:[0],helper:false,helperOn:false,baby:false,babyOn:false,twin:false,twinOn:false,angel:0,attrs:{dmg:0,atk:0,mov:0,vida:0,xp:0},cards:{},wv:2};}
+function fresh(){return {phase:1,gold:0,xp:0,lvl:1,weapon:0,baseWeapon:0,owned:[0],helper:false,helperOn:false,baby:false,babyOn:false,twin:false,twinOn:false,angel:0,attrs:{dmg:0,atk:0,mov:0,vida:0,xp:0},cards:{},wv:2,ev:{p:{},own:[],eq:null,seen:{}}};}
 const clone=o=>JSON.parse(JSON.stringify(o));
 // Permanente: fase, gold, atributos e arma comprada na Loja. Temporário (só dentro da fase): XP, nível, cartas e evoluções de arma.
-function resetPhaseStuff(){S.lvl=1;S.xp=0;S.cards={};S.weapon=S.baseWeapon||0;}
+function resetPhaseStuff(){S.lvl=1;S.xp=0;S.cards={};if(evEquipped())S.baseWeapon=Math.max(...(S.owned||[0])); // arma especial usa a melhor arma
+  S.weapon=S.baseWeapon||0;}
 function stats(){
-  const a=S.attrs,c=S.cards,W=WEAPONS[S.weapon||0],L=id=>c[id]||0,rb=(run&&run.bon)||{},B=k=>1+(rb[k]||0)/100; // B: bônus de nível da fase
+  const a=S.attrs,c=S.cards,W=curWeapon(),L=id=>c[id]||0,rb=(run&&run.bon)||{},B=k=>1+(rb[k]||0)/100; // B: bônus de nível da fase
   const fury=L('furia')&&run&&run.hp===1?1.25+.25*L('furia'):1; // Fúria: só com 1 coração
   return {W, dmg:(1+.1*a.dmg)*W.dmg*(1+.3*L('afiada'))*fury*B('dmg'), rate:1.6*(1+.08*a.atk)*W.rate*(1+.3*L('rapido'))*fury*B('atk'), mov:9*(1+.06*a.mov)*(1+[0,.4,.7][L('botas')])*B('mov'),
     maxH:3+L('coracao'), xpm:(1+.1*a.xp)*(1+.3*L('estudo'))*B('xp'), big:L('gigante'), mira:!!c.mira, exec:L('exec'), push:L('empurra'), bonus:L('bonus'), shots:1+L('dupla'), pierce:2*L('perf')+(W.pierce||0), fogo:L('fogo'),
@@ -450,6 +471,198 @@ bTex.vaga=canvasTex(160,160,(x,w,h)=>{const c=80;
   const star=(sx,sy,r)=>{x.beginPath();x.moveTo(sx,sy-r);x.lineTo(sx+r*.3,sy-r*.3);x.lineTo(sx+r,sy);x.lineTo(sx+r*.3,sy+r*.3);x.lineTo(sx,sy+r);x.lineTo(sx-r*.3,sy+r*.3);x.lineTo(sx-r,sy);x.lineTo(sx-r*.3,sy-r*.3);x.closePath();x.fill();};
   x.fillStyle='#fff';star(124,32,13);star(34,122,8);star(132,114,6);});
 
+// ---------- Eventos especiais (datas do ano) ----------
+// Em cada evento, os inimigos deixam cair itens do evento. Juntando EV_GOAL itens, você ganha a arma especial dele:
+// ela só sai nesse evento e fica com você para sempre. Quem não completar tenta de novo no ano que vem.
+// Datas do Brasil. Carnaval e Páscoa mudam todo ano: contam a partir do domingo de Páscoa.
+const EV_GOAL=250, EV_TOKEN_GOLD=5; // depois de ganhar a arma, cada item vale 5 gold (sobe com a fase)
+const EVENTS=[
+ {id:'carnaval',n:'Carnaval',item:'máscaras',item1:'máscara',easter:[-58,-46],c1:'#8a3ad8',c2:'#c98a12'},
+ {id:'pascoa',n:'Páscoa',item:'cenouras',item1:'cenoura',easter:[-13,1],c1:'#c9508f',c2:'#4f86cf'},
+ {id:'junina',n:'Festa Junina',item:'milhos',item1:'milho',from:[6,1],to:[6,30],c1:'#d8661e',c2:'#2f6fc4'},
+ {id:'criancas',n:'Dia das Crianças',item:'pirulitos',item1:'pirulito',from:[10,1],to:[10,14],c1:'#1e8fd0',c2:'#c98a12'},
+ {id:'bruxas',n:'Dia das Bruxas',item:'abóboras',item1:'abóbora',from:[10,18],to:[10,31],c1:'#d0661e',c2:'#5a2c9a'},
+ {id:'natal',n:'Natal',item:'sininhos',item1:'sininho',from:[12,1],to:[1,6],c1:'#c22e2e',c2:'#1f7a3c'},
+];
+const EV_BY={}; EVENTS.forEach(e=>EV_BY[e.id]=e);
+function easter(y){const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,
+  i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),n=h+l-7*m+114;return new Date(y,Math.floor(n/31)-1,n%31+1);}
+const addD=(d,n)=>new Date(d.getFullYear(),d.getMonth(),d.getDate()+n);
+const day0=d=>new Date(d.getFullYear(),d.getMonth(),d.getDate());
+function evRange(e,y){let a,b; // início e fim (até 23:59) do evento no ano y
+  if(e.easter){const E=easter(y);a=addD(E,e.easter[0]);b=addD(E,e.easter[1]);}
+  else{a=new Date(y,e.from[0]-1,e.from[1]);b=new Date(y+(e.to[0]<e.from[0]?1:0),e.to[0]-1,e.to[1]);}
+  return [a,new Date(b.getFullYear(),b.getMonth(),b.getDate(),23,59,59)];}
+// Esta vez (se estiver rolando) ou a próxima. key = evento + ano em que começa: o progresso zera a cada ano.
+function evOcc(e,now){const y=now.getFullYear();for(const yy of [y-1,y,y+1]){const [a,b]=evRange(e,yy);if(b>=now)return {e,a,b,key:e.id+'-'+yy,on:now>=a};}}
+let testEv=null; // modo #teste: força um evento
+function evActive(now){now=now||new Date();if(testEv)return Object.assign(evOcc(EV_BY[testEv],now),{on:true,test:true});
+  for(const e of EVENTS){const o=evOcc(e,now);if(o.on)return o;}return null;}
+function evNextUp(now){now=now||new Date();let best=null;for(const e of EVENTS){const o=evOcc(e,now);if(!o.on&&(!best||o.a<best.a))best=o;}return best;}
+const dm=d=>String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0');
+function emDias(d,now){const n=Math.round((day0(d)-day0(now))/864e5);return n<=0?'hoje':n===1?'amanhã':'em '+n+' dias';}
+
+// Armas especiais: a força acompanha a sua arma da escada (W_POWER), então nunca ficam fracas nem quebram o equilíbrio.
+// k = parte da força que vai no dano direto; o resto vem do efeito especial de cada uma.
+const W_POWER=[1,1.5,2.6,3.4,4.8,6.5,11,13,21,26]; // força aproximada de cada arma da escada, contando os efeitos
+// Natal (ideia do Arteco): o tiro é um presente e a cor dele é o elemento.
+const GIFT_EL=['fogo','veneno','raio','gelo'];
+const EL={fogo:{cor:'Vermelho',n:'Fogo',c:0xff6a3a,mul:1,d:'explode em área e deixa queimando'},
+  veneno:{cor:'Verde',n:'Veneno',c:0x6aff5a,mul:.7,d:'envenena: dano contínuo por 4 s'},
+  raio:{cor:'Azul',n:'Elétrico',c:0x6ab8ff,mul:1,d:'raio pula para 3 inimigos perto'},
+  gelo:{cor:'Branco',n:'Gelo',c:0xd8f4ff,mul:1.2,d:'mais dano e deixa 45% mais lento'}};
+const EVW={
+ natal:{n:'Lança-presentes',d:'Atira presentes. Cada cor é um elemento: vermelho fogo, verde veneno, azul elétrico, branco gelo.',rate:1.3,k:.85,size:1.2,speed:22,gifts:1,col:0xe2453a},
+ carnaval:{n:'Lança-confete',d:'Leque de 5 confetes coloridos que atravessam 1 inimigo. Forte contra grupos.',rate:1.2,k:1.2,size:.7,speed:26,pellets:5,spread:.07,pierce:1,col:0xff6ad5},
+ pascoa:{n:'Ovo saltitante',d:'O ovo pula de inimigo em inimigo e acerta até 4 por tiro (cada pulo com um pouco menos de força).',rate:1.1,k:.8,size:1,speed:22,hop:3,hopR:5,hopK:.5,col:0xffb6e1},
+ junina:{n:'Estoura-pipoca',d:'O milho estoura no inimigo e solta 6 pipocas que acertam quem está perto.',rate:1.3,k:.85,size:.85,speed:24,split:6,popK:.4,popL:.4,col:0xffe27a},
+ criancas:{n:'Lança-piões',d:'Piões que atravessam 3 inimigos e empurram todos para trás.',rate:1.2,k:.8,size:1.05,speed:20,pierce:3,knock:.35,col:0x5ad1ff},
+ bruxas:{n:'Cajado de morcegos',d:'Morcegos que voam atrás do inimigo mais perto. Não erram.',rate:1.4,k:.9,size:1.2,speed:15,home:1,flap:1,col:0xb06cff},
+};
+// Arte das armas especiais e dos itens (desenhada no código, com o contorno escuro do resto do jogo)
+const SPIN=[]; // materiais que giram no ar (presentes, confetes, ovos, milho, piões)
+function cv128(draw){const c=document.createElement('canvas');c.width=c.height=128;const x=c.getContext('2d');x.lineJoin='round';x.lineCap='round';x.strokeStyle='#1c120c';draw(x);return c;}
+const rr=(x,a,b,w,h,r)=>{x.beginPath();x.roundRect?x.roundRect(a,b,w,h,r):x.rect(a,b,w,h);};
+function sMat(src,spin,col){const m=new THREE.SpriteMaterial({map:src.isTexture?src:new THREE.CanvasTexture(src),transparent:true,depthWrite:false});
+  if(col!=null)m.color.setHex(col);if(spin){m.userData.sp=spin;SPIN.push(m);}return m;}
+function drawGift(x,c,lid,fita){x.lineWidth=6;
+  x.fillStyle=fita;for(const s of [-1,1]){x.beginPath();x.ellipse(64+s*18,30,18,11,s*.55,0,7);x.fill();x.stroke();}
+  x.fillStyle=c;rr(x,22,52,84,62,8);x.fill();x.fillStyle=fita;x.fillRect(55,52,18,62);rr(x,22,52,84,62,8);x.stroke();
+  x.fillStyle=lid;rr(x,14,38,100,22,7);x.fill();x.fillStyle=fita;x.fillRect(53,38,22,22);rr(x,14,38,100,22,7);x.stroke();
+  x.lineWidth=3;x.beginPath();x.moveTo(55,61);x.lineTo(55,112);x.moveTo(73,61);x.lineTo(73,112);x.moveTo(53,40);x.lineTo(53,58);x.moveTo(75,40);x.lineTo(75,58);x.stroke();
+  x.lineWidth=5;x.fillStyle=fita;x.beginPath();x.arc(64,36,9,0,7);x.fill();x.stroke();
+  x.fillStyle='rgba(255,255,255,.45)';rr(x,22,42,22,6,3);x.fill();rr(x,29,64,8,30,4);x.fill();}
+const GIFT_COL={fogo:['#e2453a','#f2614f','#ffd34a'],veneno:['#36a84a','#4cc35f','#ffd34a'],raio:['#3a7ee8','#5a98f2','#f2f2f2'],gelo:['#e6f2ff','#ffffff','#6ec8ff']};
+const giftCv={},giftMat={};GIFT_EL.forEach((k,i)=>{giftCv[k]=cv128(x=>drawGift(x,...GIFT_COL[k]));giftMat[k]=sMat(giftCv[k],i%2?-3:3);});
+const confCv=cv128(x=>{x.translate(64,64);x.rotate(.35);x.lineWidth=8;x.fillStyle='#fff';rr(x,-36,-20,72,40,8);x.fill();x.stroke();});
+const confTex=new THREE.CanvasTexture(confCv),CONF_COL=[0xff5a8a,0xffd23a,0x5ad1ff,0x7dff6a,0xc58bff,0xff9a3a];
+const confMats=CONF_COL.map((c,i)=>sMat(confTex,[6,-7,8,-5,7,-6][i],c));
+const confIconCv=cv128(x=>{x.lineWidth=5;for(const [a,b,r,c] of [[40,40,.4,'#ff5a8a'],[88,38,-.5,'#ffd23a'],[64,70,.1,'#5ad1ff'],[34,94,-.3,'#7dff6a'],[92,92,.6,'#c58bff']]){
+  x.save();x.translate(a,b);x.rotate(r);x.fillStyle=c;rr(x,-19,-11,38,22,5);x.fill();x.stroke();x.restore();}});
+function eggPath(x){x.beginPath();x.moveTo(64,12);x.bezierCurveTo(98,12,110,64,104,90);x.bezierCurveTo(98,114,30,114,24,90);x.bezierCurveTo(18,64,30,12,64,12);x.closePath();}
+function drawEgg(x,c,band,dot){x.lineWidth=6;x.fillStyle=c;eggPath(x);x.fill();x.save();eggPath(x);x.clip();
+  x.fillStyle=band;x.beginPath();x.moveTo(0,60);for(let i=0;i<=9;i++)x.lineTo(i*14,i%2?52:64);x.lineTo(128,78);for(let i=9;i>=0;i--)x.lineTo(i*14,i%2?74:86);x.closePath();x.fill();
+  x.fillStyle=dot;for(const [a,b] of [[46,34],[80,34],[64,24],[44,100],[64,104],[84,100]]){x.beginPath();x.arc(a,b,5,0,7);x.fill();}
+  x.fillStyle='rgba(255,255,255,.45)';x.beginPath();x.ellipse(44,44,7,14,.35,0,7);x.fill();x.restore();eggPath(x);x.stroke();}
+const EGG_COL=[['#ff9ccf','#fff1a8','#3a9ee8'],['#8fd0ff','#ffd1ec','#ffffff'],['#ffe27a','#9ee6a0','#ff6aa8']];
+const eggCv=EGG_COL.map(c=>cv128(x=>drawEgg(x,...c))),eggMats=eggCv.map((c,i)=>sMat(c,i%2?-2.5:2.5));
+const kernelCv=cv128(x=>{x.lineWidth=7;x.fillStyle='#ffc93a';x.beginPath();x.moveTo(64,14);x.bezierCurveTo(108,40,106,98,64,114);x.bezierCurveTo(22,98,20,40,64,14);x.closePath();x.fill();x.stroke();
+  x.fillStyle='#fff1b0';x.beginPath();x.moveTo(64,86);x.bezierCurveTo(84,90,84,106,64,110);x.bezierCurveTo(44,106,44,90,64,86);x.fill();
+  x.fillStyle='rgba(255,255,255,.6)';x.beginPath();x.ellipse(50,48,8,17,-.3,0,7);x.fill();});
+const popCv=cv128(x=>{const B=[[64,42,26],[38,64,24],[90,64,24],[52,90,22],[80,90,22]];
+  x.lineWidth=12;x.beginPath();for(const [a,b,r] of B){x.moveTo(a+r,b);x.arc(a,b,r,0,7);}x.stroke();
+  x.fillStyle='#fffaf0';x.beginPath();for(const [a,b,r] of B){x.moveTo(a+r,b);x.arc(a,b,r,0,7);}x.fill();
+  x.fillStyle='#ffd75a';for(const [a,b] of [[64,72],[55,80],[73,80]]){x.beginPath();x.arc(a,b,6,0,7);x.fill();}
+  x.fillStyle='#fff';x.beginPath();x.arc(54,34,7,0,7);x.fill();});
+const topCv=cv128(x=>{const C=['#ff5a5a','#ffd23a','#5ad1ff','#7dff6a','#c58bff','#ff9a3a'];
+  for(let i=0;i<6;i++){x.fillStyle=C[i];x.beginPath();x.moveTo(64,64);x.arc(64,64,52,i*Math.PI/3,(i+1)*Math.PI/3);x.closePath();x.fill();}
+  x.lineWidth=7;x.beginPath();x.arc(64,64,52,0,7);x.stroke();x.lineWidth=3;x.beginPath();x.arc(64,64,34,0,7);x.stroke();
+  x.fillStyle='#fff';x.beginPath();x.arc(64,64,13,0,7);x.fill();x.lineWidth=5;x.stroke();x.fillStyle='#1c120c';x.beginPath();x.arc(64,64,5,0,7);x.fill();});
+const batCv=cv128(x=>{x.lineWidth=6;x.fillStyle='#6a34b0';
+  for(const s of [-1,1]){x.beginPath();x.moveTo(64+s*10,56);x.quadraticCurveTo(64+s*34,26,64+s*62,40);x.quadraticCurveTo(64+s*54,50,64+s*56,64);
+    x.quadraticCurveTo(64+s*44,58,64+s*40,72);x.quadraticCurveTo(64+s*30,62,64+s*22,80);x.quadraticCurveTo(64+s*14,74,64+s*10,76);x.closePath();x.fill();x.stroke();}
+  x.fillStyle='#8f58d8';for(const s of [-1,1]){x.beginPath();x.moveTo(64+s*5,48);x.lineTo(64+s*17,26);x.lineTo(64+s*20,52);x.closePath();x.fill();x.stroke();}
+  x.beginPath();x.ellipse(64,66,21,24,0,0,7);x.fill();x.stroke();
+  x.fillStyle='#ffe14a';for(const s of [-1,1]){x.beginPath();x.ellipse(64+s*8,60,5,6,0,0,7);x.fill();x.lineWidth=3;x.stroke();}
+  x.fillStyle='#fff';for(const s of [-1,1]){x.beginPath();x.moveTo(64+s*2,76);x.lineTo(64+s*8,76);x.lineTo(64+s*5,85);x.closePath();x.fill();}
+  x.lineWidth=3;x.beginPath();x.moveTo(56,76);x.lineTo(72,76);x.stroke();});
+EVW.carnaval.mats=confMats; EVW.pascoa.mats=eggMats; EVW.junina.mats=[sMat(kernelCv,6)]; EVW.criancas.mats=[sMat(topCv,16)]; EVW.bruxas.mats=[sMat(batCv,0)];
+const popMat=sMat(popCv,5);
+// Itens de cada evento (os que caem dos inimigos)
+const tokBell=cv128(x=>{x.lineWidth=6;x.fillStyle='#e8a21e';x.beginPath();x.arc(64,104,10,0,7);x.fill();x.stroke();
+  x.fillStyle='#ffcf3a';x.beginPath();x.moveTo(64,26);x.bezierCurveTo(90,26,94,52,95,72);x.quadraticCurveTo(97,90,112,98);x.lineTo(16,98);x.quadraticCurveTo(31,90,33,72);x.bezierCurveTo(34,52,38,26,64,26);x.closePath();x.fill();x.stroke();
+  x.fillStyle='rgba(255,255,255,.55)';x.beginPath();x.ellipse(50,58,6,16,.2,0,7);x.fill();
+  x.fillStyle='#e2453a';for(const s of [-1,1]){x.beginPath();x.ellipse(64+s*15,20,15,9,s*.5,0,7);x.fill();x.stroke();}x.beginPath();x.arc(64,22,7,0,7);x.fill();x.stroke();});
+const tokMask=cv128(x=>{x.lineWidth=6;
+  x.fillStyle='#ff5aa8';x.beginPath();x.moveTo(90,46);x.quadraticCurveTo(122,14,106,4);x.quadraticCurveTo(96,26,82,44);x.closePath();x.fill();x.stroke();
+  x.fillStyle='#8a3ad8';x.beginPath();x.moveTo(10,60);x.quadraticCurveTo(14,36,40,42);x.quadraticCurveTo(64,48,88,42);x.quadraticCurveTo(114,36,118,60);
+  x.quadraticCurveTo(116,90,88,88);x.quadraticCurveTo(72,86,64,76);x.quadraticCurveTo(56,86,40,88);x.quadraticCurveTo(12,90,10,60);x.closePath();x.fill();x.stroke();
+  x.fillStyle='#1c120c';for(const s of [-1,1]){x.beginPath();x.ellipse(64+s*26,64,13,9,s*-.15,0,7);x.fill();}
+  x.fillStyle='#ffd23a';for(const [a,b] of [[24,50],[104,50],[64,58],[40,80],[88,80]]){x.beginPath();x.arc(a,b,4.5,0,7);x.fill();}});
+const tokCarrot=cv128(x=>{x.lineWidth=6;x.fillStyle='#5fc24a';for(const a of [-.5,0,.5]){x.save();x.translate(64,34);x.rotate(a);x.beginPath();x.ellipse(0,-14,8,18,0,0,7);x.fill();x.stroke();x.restore();}
+  x.fillStyle='#ff8a2a';x.beginPath();x.moveTo(38,36);x.quadraticCurveTo(64,26,90,36);x.quadraticCurveTo(78,90,64,120);x.quadraticCurveTo(50,90,38,36);x.closePath();x.fill();x.stroke();
+  x.lineWidth=4;for(const [a,b,c] of [[48,54,62],[66,70,80],[54,88,64]]){x.beginPath();x.moveTo(a,b);x.lineTo(c,b+2);x.stroke();}});
+const tokCorn=cv128(x=>{x.lineWidth=6;x.fillStyle='#ffd23a';x.beginPath();x.ellipse(64,56,22,44,0,0,7);x.fill();x.stroke();
+  x.fillStyle='#e8a21e';for(let r=0;r<6;r++)for(let c=0;c<3;c++){x.beginPath();x.arc(52+c*12,26+r*12+(c%2)*5,3.2,0,7);x.fill();}
+  x.fillStyle='#6cc24a';x.beginPath();x.moveTo(64,120);x.quadraticCurveTo(24,98,30,46);x.quadraticCurveTo(46,86,64,98);x.closePath();x.fill();x.stroke();
+  x.beginPath();x.moveTo(64,120);x.quadraticCurveTo(104,98,98,46);x.quadraticCurveTo(82,86,64,98);x.closePath();x.fill();x.stroke();});
+const tokLolli=cv128(x=>{x.lineWidth=10;x.beginPath();x.moveTo(64,70);x.lineTo(64,122);x.stroke();x.lineWidth=5;x.strokeStyle='#f4efe6';x.beginPath();x.moveTo(64,74);x.lineTo(64,120);x.stroke();
+  x.fillStyle='#ff5aa8';x.beginPath();x.arc(64,50,40,0,7);x.fill();
+  x.strokeStyle='#fff';x.lineWidth=8;x.beginPath();for(let t=0;t<15.5;t+=.1){const r=t*2.4;x.lineTo(64+Math.cos(t)*r,50+Math.sin(t)*r);}x.stroke();
+  x.strokeStyle='#1c120c';x.lineWidth=6;x.beginPath();x.arc(64,50,40,0,7);x.stroke();});
+const tokPump=cv128(x=>{x.lineWidth=6;x.fillStyle='#5a8a2a';rr(x,58,12,12,24,4);x.fill();x.stroke();
+  x.fillStyle='#ff8a1e';for(const [a,w] of [[38,30],[90,30],[64,32]]){x.beginPath();x.ellipse(a,74,w,40,0,0,7);x.fill();x.stroke();}
+  x.fillStyle='#ffe14a';for(const s of [-1,1]){x.beginPath();x.moveTo(64+s*10,64);x.lineTo(64+s*28,64);x.lineTo(64+s*19,50);x.closePath();x.fill();x.stroke();}
+  x.beginPath();x.moveTo(34,84);x.lineTo(94,84);x.lineTo(84,100);x.lineTo(74,92);x.lineTo(64,102);x.lineTo(54,92);x.lineTo(44,100);x.closePath();x.fill();x.stroke();});
+const EV_ICON={carnaval:tokMask.toDataURL(),pascoa:tokCarrot.toDataURL(),junina:tokCorn.toDataURL(),criancas:tokLolli.toDataURL(),bruxas:tokPump.toDataURL(),natal:tokBell.toDataURL()};
+const W_ICON={natal:giftCv.fogo.toDataURL(),carnaval:confIconCv.toDataURL(),pascoa:eggCv[0].toDataURL(),junina:popCv.toDataURL(),criancas:topCv.toDataURL(),bruxas:batCv.toDataURL()};
+const GIFT_ICON={};GIFT_EL.forEach(k=>GIFT_ICON[k]=giftCv[k].toDataURL());
+// Arma equipada: a de evento (se tiver uma equipada) ou a da escada.
+const evwCache={};
+function evEquipped(){const v=S&&S.ev;return v&&v.eq&&v.own&&v.own.includes(v.eq)&&EVW[v.eq]?v.eq:null;}
+function evWeapon(id,tier){const k=id+'|'+tier;if(evwCache[k])return evwCache[k];const E=EVW[id];
+  return evwCache[k]=Object.assign({},E,{id,ev:1,tier,dmg:W_POWER[Math.min(tier,W_POWER.length-1)]*E.k/E.rate/(E.pellets||1)});}
+function curWeapon(){const id=evEquipped();return id?evWeapon(id,S.weapon||0):WEAPONS[S.weapon||0];}
+// Pipoca: o milho estoura no inimigo e solta pipocas para os lados (elas não acertam de novo o mesmo inimigo)
+function popcorn(e,ar){const p=e.m.position,n=ar.split,a0=Math.random()*6.283,d=(ar.base||ar.dmg)*(ar.popK||.3);
+  for(let i=0;i<n;i++){const a=a0+i*6.283/n,m=new THREE.Sprite(popMat),z=.7;m.scale.set(z,z,1);m.position.set(p.x,1.2,p.z);scene.add(m);
+    run.ar.push({m,vx:Math.sin(a)*13,vz:Math.cos(a)*13,dmg:d,pierce:0,boom:0,bounce:0,half:ar.half,big:0,home:false,hit:new Set([e]),life:ar.popL||.32,ev:1});}
+  burst(p,0xfff3c8,5,5,.5);}
+// Ovo saltitante: depois de acertar, pula para o inimigo mais perto que ainda não levou desse ovo
+function hopTo(a,e){let t=null,bd=(a.hopR||7)**2;const p=e.m.position;
+  for(const o of run.en){if(o===e||a.hit.has(o)||o.hp<=0)continue;const d=(o.m.position.x-p.x)**2+(o.m.position.z-p.z)**2;if(d<bd){bd=d;t=o;}}
+  if(!t)return false;a.hop--;if(a.hopK)a.dmg*=a.hopK;const sp=Math.hypot(a.vx,a.vz),dx=t.m.position.x-a.m.position.x,dz=t.m.position.z-a.m.position.z,d=Math.hypot(dx,dz)||1;
+  a.vx=dx/d*sp;a.vz=dz/d*sp;a.m.rotation.y=Math.atan2(a.vx,a.vz);burst(a.m.position,0xfff1a8,3,4,.4);return true;}
+// Itens do evento: 10% por inimigo, 30% nos grandões, chefe dá 10 na certa; fase difícil dobra a chance.
+function evDrop(e){const A=run&&run.ev;if(!A)return;const ch=e.T.boss?1:(e.type==='golem'?.3:.1)*(HARD?2:1);
+  if(Math.random()<ch)evGain(A,e.T.boss?10:1,e.m.position);}
+function evGain(A,n,p){const v=S.ev,id=A.e.id;
+  if(v.own.includes(id))addGold(Math.round(n*EV_TOKEN_GOLD*phaseGold())); // já tem a arma: o item vira gold
+  else{v.p[A.key]=Math.min(EV_GOAL,(v.p[A.key]||0)+n);
+    if(!v.seen[A.key]){v.seen[A.key]=1;toast('Você achou '+(n>1?n+' '+A.e.item:'1 '+A.e.item1)+'! Junte '+EV_GOAL+' e ganhe o '+EVW[id].n);}
+    if(v.p[A.key]>=EV_GOAL)evWin(A);}
+  if(p)tokenFly(p,Math.min(n,6),id); if(run)saveEv();}
+function evWin(A){const v=S.ev,id=A.e.id;if(v.own.includes(id))return;v.own.push(id);v.eq=id; // já sai equipada
+  banner('ARMA ESPECIAL!');$('banner').style.color='#ffd34a';setTimeout(()=>$('banner').style.color='',1800);
+  toast(EVW[id].n+' é sua! Já está equipada');sfx('win');shake(.6);
+  if(run){const p=player.position.clone();ringFx(p,0xffe27a,1,10,.6);burst(p,0xffe27a,18,8,.9);}}
+function tokenFly(p,n,id){const P=$('evPill');if(P.hidden)return;const g=P.getBoundingClientRect(),tx=g.left+14,ty=g.top+g.height/2,[x,y]=scr(p);
+  for(let i=0;i<n;i++){const el=document.createElement('img');el.className='evfly';el.src=EV_ICON[id];el.alt='';el.style.left=(x+(Math.random()-.5)*24)+'px';el.style.top=(y+(Math.random()-.5)*24)+'px';
+    $('fxl').appendChild(el);setTimeout(()=>{el.style.left=tx+'px';el.style.top=ty+'px';},40+i*60);setTimeout(()=>{el.remove();bump(P);},700+i*60);}}
+// Guarda o progresso do evento na hora, sem guardar o gold da fase (esse só vale no fim, como sempre).
+function saveEv(){try{const T=clone(snap||S);T.ev=S.ev;T.daily=S.daily;localStorage.setItem(SAVE,JSON.stringify(T));}catch(_){}}
+let evPillKey='';
+function drawEvPill(){const A=run&&run.ev,P=$('evPill');if(!A){if(!P.hidden)P.hidden=true;return;}
+  const own=S.ev.own.includes(A.e.id),n=S.ev.p[A.key]||0,k=A.key+'|'+own+'|'+n;if(k===evPillKey)return;evPillKey=k;
+  P.hidden=false;P.title=A.e.n;P.innerHTML='<img src="'+EV_ICON[A.e.id]+'" alt="">'+(own?'✓':n+'/'+EV_GOAL);}
+function evHubDraw(){const now=new Date(),A=evActive(now),H=$('evHub');
+  if(A){const v=S.ev,own=v.own.includes(A.e.id),n=v.p[A.key]||0,W=EVW[A.e.id];H.className='evhub';
+    H.style.setProperty('--e1',A.e.c1);H.style.setProperty('--e2',A.e.c2);
+    H.innerHTML=`<img src="${EV_ICON[A.e.id]}" alt=""><span class="tx">Evento de ${A.e.n}${A.test?' (teste)':''}!<small>${own?'Você já tem o '+W.n+'. Agora cada '+A.e.item1+' vale gold.':'Junte '+EV_GOAL+' '+A.e.item+' e ganhe o '+W.n+'. Termina '+emDias(A.b,now)+' ('+dm(A.b)+').'}</small>${own?'':`<div class="mbar"><i style="width:${100*n/EV_GOAL}%"></i></div>`}</span>`;
+    $('evBadge').hidden=own;}
+  else{const N=evNextUp(now);H.className='evhub off';
+    H.innerHTML=`<img src="${EV_ICON[N.e.id]}" alt=""><span class="tx">Próximo evento: ${N.e.n}<small>Começa ${emDias(N.a,now)} (${dm(N.a)}). Arma especial: ${EVW[N.e.id].n}.</small></span>`;$('evBadge').hidden=true;}
+  H.hidden=false;}
+function showEvent(){const now=new Date(),A=evActive(now),v=S.ev,O=A||evNextUp(now),e=O.e,W=EVW[e.id],own=v.own.includes(e.id),n=v.p[O.key]||0,best=WEAPONS[Math.max(...S.owned)].n;
+  let h=`<div class="evhub${A?'':' off'}" style="--e1:${e.c1};--e2:${e.c2};cursor:default"><img src="${EV_ICON[e.id]}" alt=""><span class="tx">${A?'Agora: ':'Próximo evento: '}${e.n}${A&&A.test?' (teste)':''}<small>${dm(O.a)} a ${dm(O.b)} · ${A?'termina '+emDias(O.b,now):'começa '+emDias(O.a,now)}</small></span></div>`;
+  h+=`<p>${A?(own?'Você já ganhou a arma deste evento. Agora cada '+e.item1+' que cair vale gold.':'Derrote inimigos para juntar '+e.item+': cada chefe dá 10 e na fase difícil cai o dobro. Com '+EV_GOAL+' você ganha a arma especial, que só sai neste evento e fica com você para sempre.'):'Durante o evento, os inimigos deixam cair '+e.item+'. Junte '+EV_GOAL+' para ganhar a arma especial, que só sai nesse evento e fica com você para sempre.'}</p>`;
+  if(A&&!own)h+=`<div><div class="row"><b>${n}/${EV_GOAL} ${e.item}</b><span class="tag">faltam ${EV_GOAL-n}</span></div><div class="mbar" style="height:12px"><i style="width:${100*n/EV_GOAL}%"></i></div></div>`;
+  h+=`<div class="card" style="cursor:default"><span class="ic ev"><img src="${W_ICON[e.id]}" alt=""></span><span class="tx"><span class="tag">Arma especial</span><b>${W.n}</b><small>${W.d} A força acompanha a sua melhor arma (agora: ${best}).</small></span><span class="pr">${own?'✓ Sua':''}</span></div>`;
+  if(W.gifts)h+=`<div class="els">${GIFT_EL.map(k=>`<div class="el"><img src="${GIFT_ICON[k]}" alt=""><span><b>${EL[k].cor}: ${EL[k].n}</b>${EL[k].d}</span></div>`).join('')}</div>`;
+  $('evMain').innerHTML=h;
+  const L=$('evList');L.innerHTML='';
+  for(const ev of EVENTS){const o=evOcc(ev,now),on=A?A.e===ev:o.on,mine=v.own.includes(ev.id),d=document.createElement('div');d.className='card'+(mine?' done':'');d.style.cursor='default';
+    d.innerHTML=`<span class="ic ev"><img src="${EV_ICON[ev.id]}" alt=""></span><span class="tx"><b>${ev.n}</b><small>${dm(o.a)} a ${dm(o.b)} · ${EVW[ev.id].n}</small></span><span class="pr">${mine?'✓ Sua':on?'Agora':emDias(o.a,now)}</span>`;L.appendChild(d);}
+  $('mStart').hidden=true;$('mEvent').hidden=false;}
+// Aba Armas: armas especiais que você já ganhou (usam a força da sua melhor arma da escada)
+function armsEv(L){const own=(S.ev&&S.ev.own)||[],eq=evEquipped(),bi=Math.max(...S.owned),now=new Date();
+  const t=document.createElement('p');t.className='tag';t.textContent='Armas especiais (só saem em eventos)';L.appendChild(t);
+  if(!own.length){const N=evActive(now)||evNextUp(now),p=document.createElement('p');
+    p.textContent=N.on?'O evento de '+N.e.n+' está rolando: junte '+N.e.item+' para ganhar o '+EVW[N.e.id].n+'.':'Próximo evento: '+N.e.n+' ('+emDias(N.a,now)+'), com o '+EVW[N.e.id].n+'.';L.appendChild(p);return;}
+  for(const id of own){const W=EVW[id],b=document.createElement('button');b.className='card';
+    b.innerHTML=`<span class="ic ev"><img src="${W_ICON[id]}" alt=""></span><span class="tx"><span class="tag">${EV_BY[id].n}</span><b>${W.n}</b><small>${W.d} Força da sua melhor arma (${WEAPONS[bi].n}).</small></span><span class="pr">${eq===id?'Equipada':'Equipar'}</span>`;
+    b.onclick=()=>{S.ev.eq=id;S.baseWeapon=bi;S.weapon=bi;showArms();};L.appendChild(b);}}
+
 // ---------- partida ----------
 function clearWorld(){ if(!run) return; [...run.en,...run.ar,...run.bo,...run.fx].forEach(o=>scene.remove(o.m)); }
 // Fase Difícil: 1 fase surpresa por mapa (a cada 5 fases), sorteada e obrigatória. Só se descobre ao entrar.
@@ -471,11 +684,11 @@ function startPhase(keep){
   snap=clone(S);
   const st=stats();
   run={t:0,wave:1,toSpawn:waveCount(1),spawnT:0,waveGap:0,boss:null,bossSpawned:false,en:[],ar:[],bo:[],fx:[],
-    hp:st.maxH,fireT:0,helpT:0,babyT:1,twinT:1.6,bonT:5,rainT:15,shieldT:0,shield:!!st.esc,triple:0,slowAll:0,pendingLv:pend,done:false,bon:{}};
-  player.position.x=0; player.position.z=PZ; targetX=0; targetZ=PZ;
+    hp:st.maxH,fireT:0,helpT:0,babyT:1,twinT:1.6,bonT:5,rainT:15,shieldT:0,shield:!!st.esc,triple:0,slowAll:0,pendingLv:pend,done:false,bon:{},ev:evActive()};
+  evPillKey=''; player.position.x=0; player.position.z=PZ; targetX=0; targetZ=PZ;
   ground.material.color.setHex(era().ground); lane.material.color.setHex(era().lane);
   if(HARD){const red=new THREE.Color(1,.68,.62);ground.material.color.multiply(red);lane.material.color.multiply(red);}
-  syncUnits(); hud(); if(HARD){banner('FASE DIFÍCIL!');toast('Surpresa! Muito gold, muito perigo');sfx('boss');shake(.6);}else toast('Fase '+S.phase+': '+era().n);
+  syncUnits(); hud(); if(HARD){banner('FASE DIFÍCIL!');toast('Surpresa! Muito gold, muito perigo');sfx('boss');shake(.6);}else toast('Fase '+S.phase+': '+era().n+(run.ev?' · '+run.ev.e.n+'!':''));
 }
 function waveCount(w){return Math.round((6+2*w+Math.min(30,Math.round(.8*(S.phase-1))))*(HARD?HARD_K.count:1));}
 // Vida dos inimigos pensada para 200+ fases: x7 na fase 20, x23 na 50, x65 na 100, x209 na 200 (fase 1 pela metade).
@@ -531,9 +744,17 @@ function shoot(from,dmg,count,gold,half,power){
   // Flechas laterais: +2 em diagonal (só o arqueiro)
   if(st.lateral&&!half)angs.push(ang-.5,ang+.5);
   angs.forEach((a,i)=>{
-    const m=new THREE.Mesh(arrowGeo,mat); {const g=(st.big?1+.8*st.big:1)*(power?1.5:1);m.scale.set(W.size*1.4*g,W.size*1.4*g,W.size*g);} m.position.set(from.x,1,from.z+.5); m.rotation.y=a; m.add(new THREE.Mesh(trailGeo,trailMat(gold||power?0xffc94a:W.col))); scene.add(m);
+    const g=(st.big?1+.8*st.big:1)*(power?1.5:1);let m,el=null,d=dmg;
+    if(W.ev){ // arma especial de evento: o tiro é um desenho (presente, confete, ovo...)
+      if(W.gifts){el=GIFT_EL[Math.random()*4|0];d=dmg*EL[el].mul;} // Natal: a cor do presente é o elemento
+      m=new THREE.Sprite(W.gifts?giftMat[el]:W.mats[(W.pellets?i:Math.random()*W.mats.length|0)%W.mats.length]);
+      m.scale.set(W.size*g,W.size*g,1);m.position.set(from.x,1.15,from.z+.5);
+    }else{m=new THREE.Mesh(arrowGeo,mat);m.scale.set(W.size*1.4*g,W.size*1.4*g,W.size*g);m.position.set(from.x,1,from.z+.5);}
+    m.rotation.y=a; m.add(new THREE.Mesh(trailGeo,trailMat(gold||power?0xffc94a:el?EL[el].c:W.col))); scene.add(m);
     if(i===0)sfx('shot');
-    run.ar.push({m,vx:Math.sin(a)*W.speed,vz:Math.cos(a)*W.speed,dmg,pierce:half?Math.floor(st.pierce/2):st.pierce,boom:W.boom||(st.expl?.8+.4*st.expl:0),bounce:half?Math.floor(st.rico/2):st.rico,half:!!half,big:st.big,home:!!W.home,hit:new Set()});});
+    const pr={m,vx:Math.sin(a)*W.speed,vz:Math.cos(a)*W.speed,dmg:d,pierce:half?Math.floor(st.pierce/2):st.pierce,boom:W.boom||(st.expl?.8+.4*st.expl:0),bounce:half?Math.floor(st.rico/2):st.rico,half:!!half,big:st.big,home:!!W.home,hit:new Set()};
+    if(W.ev){Object.assign(pr,{ev:1,base:dmg,el,hop:W.hop||0,hopR:W.hopR,hopK:W.hopK,split:W.split||0,popK:W.popK,popL:W.popL,knock:W.knock||0,flap:W.flap?1:0,s0:m.scale.x,ph:Math.random()*6});if(el==='fogo')pr.boom=Math.max(pr.boom,1.8);}
+    run.ar.push(pr);});
 }
 function hurt(e,d){e.hp-=d; tint(e,0xff9090); e.flash=.08; e.hitT=.15;}
 function kill(e){
@@ -543,6 +764,7 @@ function kill(e){
   const st=stats(); addGold(Math.round(e.T.g*st.goldm*phaseGold()*(HARD?3:1))); gainXp(e.T.xp*st.xpm);
   if(st.vamp){run.kills=(run.kills||0)+1;if(run.kills%25===0&&run.hp<st.maxH){run.hp++;toast('Vampiro: +1 coração');}}
   dailyAdd('kill');if(e.T.fly)dailyAdd('fly');if(e.type==='golem')dailyAdd('tank');if(e.T.boss)dailyAdd('boss');
+  evDrop(e);
   if(e===run.boss){run.boss=null; phaseWon();}
 }
 function gainXp(v){S.xp+=v; let up=false; while(S.xp>=xpNeed(S.lvl)){S.xp-=xpNeed(S.lvl);S.lvl++;run.pendingLv++;sfx('level');up=true;}
@@ -558,6 +780,13 @@ function hitEnemy(e,ar){
     const b=new THREE.Mesh(new THREE.SphereGeometry(ar.boom,14,10),new THREE.MeshBasicMaterial({color:ar.fixed?0xff7ad9:0xff9a40,transparent:true,opacity:.45}));
     b.position.copy(e.m.position);scene.add(b);run.fx.push({m:b,life:.18});shake(.15);}
   if(ar.fixed)return;
+  if(ar.ev){const b=ar.base||ar.dmg,hf=ar.half?.5:1,p=e.m.position; // armas especiais de evento
+    if(ar.el==='fogo'){const w=e.burn>0?e.burnD:0;e.burn=3;e.burnD=Math.max(w,b*.25*hf);burst(p,0xff8a3a,4,5,.55);}
+    else if(ar.el==='veneno'){const w=e.pois>0?e.poisD:0;e.pois=4;e.poisD=Math.max(w,b*.3*hf);burst(p,0x7dff6a,5,4,.6);}
+    else if(ar.el==='raio'){let n=0;for(const o of run.en){if(o===e||n>=3)continue;if(o.m.position.distanceTo(p)<5){hurt(o,b*.5*hf);lightning(p,o.m.position);n++;}}burst(p,0x9fd8ff,4,5,.5);}
+    else if(ar.el==='gelo'){e.slow=2.5;e.slowF=.55;e.chill=2.5;ringFx(p.clone(),0xd8f4ff,.6,2.6,.25);}
+    if(ar.split)popcorn(e,ar);
+    if(ar.knock&&!e.T.boss)e.m.position.z=Math.min(SPAWNZ,e.m.position.z+ar.knock*hf);}
   if(st.exec&&!e.T.boss&&e.hp>0&&e.hp<e.max*(.1+.05*st.exec))e.hp=0;
   if(st.push)e.m.position.z=Math.min(SPAWNZ,e.m.position.z+(e.T.boss?.12:(ar.half?.3:.6))*(1+(st.push-1)/3));
   // glitter do bebê: dano fixo, sem cartas nem atributos
@@ -629,7 +858,7 @@ function showJourney(){const p=S.phase,inEra=Math.min(ERAS.length-1,Math.floor((
   $('mStart').hidden=true;$('mJourney').hidden=false;}
 $('btnJourney').onclick=showJourney;
 $('btnJourneyClose').onclick=()=>{$('mJourney').hidden=true;showHub();};
-function keepHalf(){const k=Math.floor((run&&run.earned||0)/2),used=run&&run.angelShop,dl=S.daily;S=clone(snap);S.daily=dl;S.gold+=k;if(used)S.angel=Math.max(0,(S.angel||0)-1);return k;}
+function keepHalf(){const k=Math.floor((run&&run.earned||0)/2),used=run&&run.angelShop,dl=S.daily,ev=S.ev;S=clone(snap);S.daily=dl;S.ev=ev;S.gold+=k;if(used)S.angel=Math.max(0,(S.angel||0)-1);return k;}
 // Anjo da Guarda: carta da fase (1 vez) ou da Loja (gasta 1). Revive com vida cheia e limpa a tela.
 function revive(){let from='';
   if(S.cards.anjo&&!run.angelCard){run.angelCard=true;from='carta';}
@@ -773,11 +1002,12 @@ addEventListener('keydown',e=>keys[e.key.length==1?e.key.toLowerCase():e.key]=1)
 
 // ---------- loop ----------
 let last=performance.now();
-function paused(){return !$('mArms').hidden||!$('mDaily').hidden||!$('mJourney').hidden||!$('mPause').hidden||!$('mCards').hidden||!$('mAttr').hidden||!$('mMsg').hidden||!$('mStart').hidden;}
+function paused(){return !$('mArms').hidden||!$('mDaily').hidden||!$('mEvent').hidden||!$('mJourney').hidden||!$('mPause').hidden||!$('mCards').hidden||!$('mAttr').hidden||!$('mMsg').hidden||!$('mStart').hidden;}
 function step(dt){
   const st=stats(); run.t+=dt;
   if(run.lvT>0){run.lvT-=dt;if(run.lvT<=0&&run.pendingLv&&!paused())showCards();}
   for(const t of TREES)t.material.rotation=Math.sin(run.t*1.3+t.userData.p)*.06;
+  for(const mm of SPIN)mm.rotation+=dt*mm.userData.sp; // presentes, confetes e piões girando
   // movimento
   if(keys.ArrowRight||keys.d)targetX=Math.max(-HALF,targetX-st.mov*dt); if(keys.ArrowLeft||keys.a)targetX=Math.min(HALF,targetX+st.mov*dt);
   if(keys.ArrowUp||keys.w)targetZ=Math.min(ZMAX,targetZ+st.mov*dt); if(keys.ArrowDown||keys.s)targetZ=Math.max(PZ,targetZ-st.mov*dt);
@@ -813,6 +1043,8 @@ function step(dt){
   stakeM.visible=!!st.estacas;
   // flechas
   for(const a of [...run.ar]){
+    if(a.life!=null){a.life-=dt;if(a.life<=0){scene.remove(a.m);run.ar.splice(run.ar.indexOf(a),1);continue;}} // pipocas somem rápido
+    if(a.flap)a.m.scale.x=a.s0*(.72+.28*Math.abs(Math.sin(run.t*14+a.ph))); // morcego batendo as asas
     if(a.home){const t=nearest(a.m.position.x,a.m.position.z);if(t){const sp=Math.hypot(a.vx,a.vz),dx=t.m.position.x-a.m.position.x,dz=t.m.position.z-a.m.position.z,d=Math.hypot(dx,dz)||1,k=Math.min(1,dt*5);
       a.vx+=(dx/d*sp-a.vx)*k;a.vz+=(dz/d*sp-a.vz)*k;const n=Math.hypot(a.vx,a.vz)||1;a.vx*=sp/n;a.vz*=sp/n;a.m.rotation.y=Math.atan2(a.vx,a.vz);}}
     a.m.position.x+=a.vx*dt;a.m.position.z+=a.vz*dt;
@@ -825,14 +1057,16 @@ function step(dt){
     if(a.m.position.z>SPAWNZ+3||a.m.position.z<-2||Math.abs(a.m.position.x)>HALF+3){scene.remove(a.m);run.ar.splice(run.ar.indexOf(a),1);continue;}
     for(const e of run.en){if(a.hit.has(e))continue;const p=e.m.position;
       if((p.x-a.m.position.x)**2+(p.z-a.m.position.z)**2<(e.r+.3+.45*(a.big||0))**2){a.hit.add(e);hitEnemy(e,a);
+        if(a.hop>0&&hopTo(a,e))break;
         if(a.pierce--<=0){scene.remove(a.m);run.ar.splice(run.ar.indexOf(a),1);break;}}}}
   // inimigos
   for(const e of [...run.en]){
-    if(e.burn>0){const t=Math.min(dt,e.burn);e.burn-=dt;e.hp-=e.burnD*t;
-      if(!(e.flash>0))tint(e,e.burn>0?0xffa860:0xffffff);}
-    if(e.slow>0)e.slow-=dt;
-    if(e.flash>0){e.flash-=dt;if(e.flash<=0)tint(e,e.burn>0?0xffa860:0xffffff);}
-    if(!(e.flash>0)){if(run.freeze>0)tint(e,0xa8e4ff);else if(unf)tint(e,e.burn>0?0xffa860:0xffffff);}
+    if(e.burn>0){const t=Math.min(dt,e.burn);e.burn-=dt;e.hp-=e.burnD*t;}
+    if(e.pois>0){const t=Math.min(dt,e.pois);e.pois-=dt;e.hp-=e.poisD*t;} // veneno (presente verde)
+    if(e.slow>0)e.slow-=dt; if(e.chill>0)e.chill-=dt;
+    if(e.flash>0)e.flash-=dt;
+    // cor do inimigo: congelado, envenenado (verde), queimando (laranja), gelado pelo presente branco
+    if(!(e.flash>0))tint(e,run.freeze>0?0xa8e4ff:e.pois>0?0xb0ff8c:e.burn>0?0xffa860:e.chill>0?0xc8eeff:0xffffff);
     if(e.hp<=0){kill(e);if(run.done)return;continue;}
     let sp=e.sp*(e.slow>0?(e.slowF||.6):1)*(run.slowAll>0?.5:1)*(run.freeze>0?0:1);
     const p=e.m.position;
@@ -887,7 +1121,7 @@ function hud(){const st=stats();drawSlots();
   $('phase').textContent=run.bossSpawned?'Fase '+S.phase+(HARD?' 🔥':'')+' · Chefe':'Fase '+S.phase+(HARD?' 🔥':'')+' · Onda '+run.wave+'/'+(HARD?HARD_WAVES:5);
   $('gold').textContent=S.gold+' gold'; $('lvl').textContent='Nv '+S.lvl+' · '+st.W.n;
   $('xp').style.width=(100*S.xp/xpNeed(S.lvl))+'%';
-  $('bossbar').style.display=run.boss?'block':'none'; if(run.boss)$('bosshp').style.width=(100*run.boss.hp/run.boss.max)+'%';}
+  $('bossbar').style.display=run.boss?'block':'none'; if(run.boss)$('bosshp').style.width=(100*run.boss.hp/run.boss.max)+'%';drawEvPill();}
 function showCards(){
   const used=slotsUsed(),disc=cardDisc();
   // Até 5 cartas por fase, e a evolução de arma conta como carta. Sem melhorias: quem não gostar das oferecidas pula e tenta no próximo nível.
@@ -896,7 +1130,8 @@ function showCards(){
   const pool=CARDS.filter(c=>!S.cards[c.id]);
   const pick=[];
   const NW=WEAPONS[(S.weapon||0)+1];
-  if(NW&&S.phase>=NW.ph)pick.push({id:'_arma',n:'Evoluir: '+NW.n,t:'Evolução de arma',d:NW.d,p:NW.p,ic:'★'});
+  const EQ=evEquipped(); // com arma especial, a evolução dá a ela a força da próxima arma
+  if(NW&&S.phase>=NW.ph)pick.push(EQ?{id:'_arma',n:'Evoluir: '+EVW[EQ].n,t:'Evolução de arma',d:'Ganha a força de: '+NW.n+' (só nesta fase)',p:NW.p,ic:'★'}:{id:'_arma',n:'Evoluir: '+NW.n,t:'Evolução de arma',d:NW.d,p:NW.p,ic:'★'});
   while(pick.length<3&&pool.length)pick.push(pool.splice(Math.random()*pool.length|0,1)[0]);
   if(!pick.length){levelPrize(run.pendingLv);run.pendingLv=0;return;}
   const newLv=S.lvl-run.pendingLv+1, free=newLv===2;
@@ -908,7 +1143,7 @@ function showCards(){
     const cost=free||luck?0:Math.round(cardCost(c)*disc),ok=S.gold>=cost,b=document.createElement('button');b.className='card'+(ok?'':' off');
     b.innerHTML=`<span class="ic">${c.ic}</span><span class="tx"><span class="tag">${c.t}</span><b>${c.n}</b><small>${c.d}</small></span><span class="pr">${cost?cost+' gold':(luck?'Grátis (Sorte)':'Grátis')}</span>`;
     b.onclick=()=>{if(!ok){toast('Gold insuficiente');return;}S.gold-=cost;
-      if(arma){S.weapon=(S.weapon||0)+1;toast('Nova arma: '+WEAPONS[S.weapon].n);}
+      if(arma){S.weapon=(S.weapon||0)+1;toast(EQ?EVW[EQ].n+' ficou mais forte!':'Nova arma: '+WEAPONS[S.weapon].n);}
       else{S.cards[c.id]=1;if(c.id==='coracao')run.hp=Math.min(stats().maxH,run.hp+1);}
       dailyAdd('cards');syncUnits();nextCard();};L.appendChild(b);}
   $('mCards').hidden=false;
@@ -930,7 +1165,7 @@ function showAttrs(){const L=$('attrList');L.innerHTML='';$('attrGold').textCont
   WEAPONS.forEach((w,i)=>{if(S.owned.includes(i))return;const need=w.ph||1,lock=S.phase<need,own=false,eq=i===(S.baseWeapon||0),ok=!lock&&S.gold>=w.shop,b=document.createElement('button');b.className='card'+(ok||eq?'':' off');
     b.innerHTML=`<span class="ic">${lock?'🔒':i}</span><span class="tx"><b>${w.n}</b><small>${lock?'Libera na fase '+need+' · '+w.shop+' gold':(w.d||'Arma inicial')}</small></span><span class="pr">${lock?'Fase '+need:w.shop+' gold'}</span>`;
     b.onclick=()=>{if(eq)return;if(lock){toast('Chegue na fase '+need+' para liberar');return;}
-      if(!ok){toast('Gold insuficiente');return;}S.gold-=w.shop;S.owned.push(i);S.baseWeapon=i;S.weapon=i;toast('Nova arma: '+w.n);showAttrs();};WL.appendChild(b);});
+      if(!ok){toast('Gold insuficiente');return;}S.gold-=w.shop;S.owned.push(i);S.baseWeapon=i;S.weapon=i;S.ev.eq=null;toast('Nova arma: '+w.n);showAttrs();};WL.appendChild(b);});
   if(!S.baby){const ok=S.gold>=1908,b=document.createElement('button');b.className='card'+(ok?'':' off');
     b.innerHTML=`<span class="ic">✦</span><span class="tx"><span class="tag">Personagem</span><b>Gêmeo 1908</b><small>A menina, a do glitter mais pesado: 3 bolinhas de glitter, 5 de dano cada, em área. Dano fixo, não usa seus atributos nem cartas</small></span><span class="pr">1908 gold</span>`;
     b.onclick=()=>{if(!ok){toast('Gold insuficiente');return;}S.gold-=1908;S.baby=true;S.babyOn=true;toast('Gêmeo 1908 chegou!');showAttrs();};WL.appendChild(b);}
@@ -965,12 +1200,14 @@ function load(){try{const v=JSON.parse(localStorage.getItem(SAVE));if(!v||!v.att
   if(!v.wv){const up=i=>i>=3?i+1:i;v.owned=(v.owned||[0]).map(up);v.baseWeapon=up(v.baseWeapon||0);v.weapon=up(v.weapon||0);v.wv=2;} // Escopeta entrou no índice 3
   return Object.assign(fresh(),v);}catch(_){return null;}}
 function showHub(){resetPhaseStuff();ensureDaily();save();$('dailyBadge').hidden=!dailyClaimable();$('testBar').hidden=location.hash!=='#teste';$('hubInfo').textContent='Fase '+S.phase+' ('+era().n+') · '+stats().W.n+' · '+S.gold+' gold · recorde: fase '+(S.best||0);
-  $('btnStart').textContent='Jogar fase '+S.phase; $('mStart').hidden=false;}
+  $('btnStart').textContent='Jogar fase '+S.phase; evHubDraw(); $('mStart').hidden=false;}
 $('btnShop').onclick=showAttrs;
 function showArms(){const L=$('armsList');L.innerHTML='';S.owned=S.owned||[0];
-  S.owned.slice().sort((a,b)=>a-b).forEach(i=>{const w=WEAPONS[i],eq=i===(S.baseWeapon||0),b=document.createElement('button');b.className='card';
+  const evq=evEquipped();
+  S.owned.slice().sort((a,b)=>a-b).forEach(i=>{const w=WEAPONS[i],eq=!evq&&i===(S.baseWeapon||0),b=document.createElement('button');b.className='card';
     b.innerHTML=`<span class="ic">${i}</span><span class="tx"><b>${w.n}</b><small>${w.d||'Arma inicial'}</small></span><span class="pr">${eq?'Equipada':'Equipar'}</span>`;
-    b.onclick=()=>{S.baseWeapon=i;S.weapon=i;showArms();};L.appendChild(b);});
+    b.onclick=()=>{S.baseWeapon=i;S.weapon=i;S.ev.eq=null;showArms();};L.appendChild(b);});
+  armsEv(L);
   if(S.baby){const b=document.createElement('button');b.className='card';
     b.innerHTML=`<span class="ic">✦</span><span class="tx"><span class="tag">Personagem</span><b>Gêmeo 1908</b><small>Glitter forte em área, dano fixo</small></span><span class="pr">${S.babyOn?'Levando':'Levar'}</span>`;
     b.onclick=()=>{S.babyOn=!S.babyOn;showArms();};L.appendChild(b);}
@@ -982,6 +1219,8 @@ function showArms(){const L=$('armsList');L.innerHTML='';S.owned=S.owned||[0];
     b.onclick=()=>{S.helperOn=!S.helperOn;showArms();};L.appendChild(b);}
   $('mArms').hidden=false;}
 $('btnArms').onclick=showArms;
+$('btnEvent').onclick=showEvent; $('evHub').onclick=showEvent;
+$('btnEventClose').onclick=()=>{$('mEvent').hidden=true;showHub();};
 $('btnDaily').onclick=showDaily;
 $('btnDailyClose').onclick=()=>{$('mDaily').hidden=true;showHub();};
 $('btnArmsClose').onclick=()=>{$('mArms').hidden=true;showHub();};
@@ -991,6 +1230,8 @@ $('tNext').onclick=()=>{S.phase+=5;showHub();};
 $('tNext50').onclick=()=>{S.phase+=50;showHub();};
 $('tGold').onclick=()=>{S.gold+=1000;showHub();};
 $('tRare').onclick=()=>{testRare=!testRare;$('tRare').textContent='Moeda rara: '+(testRare?'50%':'0,819%');};
+$('tEv').onclick=()=>{const ids=[null,...EVENTS.map(e=>e.id)];testEv=ids[(ids.indexOf(testEv)+1)%ids.length];$('tEv').textContent='Evento: '+(testEv?EV_BY[testEv].n:'automático');showHub();};
+$('tEvAdd').onclick=()=>{const A=evActive();if(!A){$('tEvAdd').textContent='Sem evento agora';return;}evGain(A,50,null);showHub();};
 $('btnQuit').onclick=()=>{save();$('mQuit').hidden=false;try{window.close();}catch(_){}};
 $('btnQuitBack').onclick=()=>{$('mQuit').hidden=true;};
 $('btnAttrClose').onclick=()=>{$('mAttr').hidden=true;if(!$('mStart').hidden)showHub();};
