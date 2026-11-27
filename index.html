@@ -105,7 +105,7 @@ p{margin:0;color:var(--muted);line-height:1.45}
   <button class="btn ghost" id="btnArms">Armas</button>
   <button class="btn ghost" id="btnShop">Loja</button>
   <button class="btn ghost" id="btnQuit">Sair</button>
-  <div class="row" id="testBar" hidden style="flex-wrap:wrap;justify-content:center"><button class="btn ghost" id="tPrev">Fase -5</button><button class="btn ghost" id="tNext">Fase +5</button><button class="btn ghost" id="tNext50">Fase +50</button><button class="btn ghost" id="tGold">+1000 gold</button><button class="btn ghost" id="tRare">Moeda rara: 0,819%</button><button class="btn ghost" id="tEv">Evento: automático</button><button class="btn ghost" id="tEvAdd">+50 itens do evento</button><button class="btn ghost" id="tFl">Floresta: sessão +5</button></div>
+  <div class="row" id="testBar" hidden style="flex-wrap:wrap;justify-content:center"><button class="btn ghost" id="tPrev">Fase -5</button><button class="btn ghost" id="tNext">Fase +5</button><button class="btn ghost" id="tNext50">Fase +50</button><button class="btn ghost" id="tGold">+1000 gold</button><button class="btn ghost" id="tRare">Moeda rara: 0,819%</button><button class="btn ghost" id="tEv">Evento: automático</button><button class="btn ghost" id="tEvAdd">+50 itens do evento</button><button class="btn ghost" id="tFl">Floresta: sessão +5</button><button class="btn ghost" id="tMina">Minas: normal</button></div>
   <p class="tag" id="verTag">Protótipo · formas simples no lugar da arte</p>
 </div></div>
 <div class="modal" id="mCards" hidden><div class="box">
@@ -208,6 +208,8 @@ const CARDS=[
  {id:'furia',n:'Fúria',t:'Arma',d:'Com 1 coração: +50% de dano e de velocidade de tiro',p:80,ic:'✹'},
  {id:'certeiro',n:'Tiro certeiro',t:'Arma',d:'A cada 5 tiros, 1 tiro com 4x de dano',p:90,ic:'⊕'},
  {id:'pechincha',n:'Pechincha',t:'Passiva',d:'Cartas e evoluções de arma custam 30% menos',p:60,ic:'%'},
+ // Ideia do Arteco (2026-11-27)
+ {id:'minas',n:'Minas terrestres',t:'Especial',d:'A cada 15 s uma mina aparece em qualquer lugar do mapa. Inimigo que pisa faz explodir: todos pertinho perdem 19,08% da vida',p:130,ic:'◉'},
 ];
 const MAX_SLOTS=5;
 // Prêmio de nível depois das 5 cartas (sem janela): sorteia entre +1% num atributo sorteado (vale só nesta fase) e 5 gold.
@@ -242,7 +244,7 @@ function sfx(k){if(muted||!AC)return;const t=AC.currentTime;
   if(k==='shot'){if(t-lastShot<.09)return;lastShot=t;}
   if(k==='chop'){if(t-lastChop<.08)return;lastChop=t;}
   const P={shot:[880,440,.05,'square',.03],hit:[220,110,.06,'triangle',.05],kill:[520,180,.12,'sawtooth',.05],hurt:[160,60,.3,'sawtooth',.12],
-    level:[520,1040,.25,'triangle',.08],chop:[420,170,.07,'triangle',.07],tree:[190,55,.45,'triangle',.13],bonus:[700,1400,.15,'sine',.08],win:[392,784,.5,'triangle',.1],boss:[90,60,.6,'sawtooth',.12]}[k];
+    level:[520,1040,.25,'triangle',.08],chop:[420,170,.07,'triangle',.07],mina:[150,40,.4,'sawtooth',.13],tree:[190,55,.45,'triangle',.13],bonus:[700,1400,.15,'sine',.08],win:[392,784,.5,'triangle',.1],boss:[90,60,.6,'sawtooth',.12]}[k];
   const o=AC.createOscillator(),g=AC.createGain();o.type=P[3];o.frequency.setValueAtTime(P[0],t);o.frequency.exponentialRampToValueAtTime(P[1],t+P[2]);
   g.gain.setValueAtTime(P[4],t);g.gain.exponentialRampToValueAtTime(.0001,t+P[2]);o.connect(g).connect(AC.destination);o.start(t);o.stop(t+P[2]+.02);}
 
@@ -272,7 +274,7 @@ function stats(){
   const fury=L('furia')&&run&&run.hp===1?1.25+.25*L('furia'):1; // Fúria: só com 1 coração
   return {W, dmg:(1+.1*a.dmg)*W.dmg*(1+.3*L('afiada'))*fury*B('dmg'), rate:1.6*(1+.08*a.atk)*W.rate*(1+.3*L('rapido'))*fury*B('atk'), mov:9*(1+.06*a.mov)*(1+[0,.4,.7][L('botas')])*B('mov'),
     maxH:3+L('coracao'), xpm:(1+.1*a.xp)*(1+.3*L('estudo'))*B('xp'), big:L('gigante'), mira:!!c.mira, exec:L('exec'), push:L('empurra'), bonus:L('bonus'), shots:1+L('dupla'), pierce:2*L('perf')+(W.pierce||0), fogo:L('fogo'),
-    gelo:L('gelo'), raio:L('raio'), ajud:!!(S.helper&&S.helperOn), cav:!!c.cav, ima:!!c.ima, goldm:1+.25*L('sorte'), esc:L('esc'), chuva:L('chuva'), rico:L('rico')?1+2*L('rico'):0, crit:L('crit'), expl:L('expl'), vamp:!!c.vamp,
+    gelo:L('gelo'), raio:L('raio'), ajud:!!(S.helper&&S.helperOn), cav:!!c.cav, ima:!!c.ima, goldm:1+.25*L('sorte'), esc:L('esc'), chuva:L('chuva'), minas:L('minas'), rico:L('rico')?1+2*L('rico'):0, crit:L('crit'), expl:L('expl'), vamp:!!c.vamp,
     muralha:L('muralha'), erva:L('erva'), estacas:L('estacas'), gelado:L('gelado'), lateral:L('lateral'), gigantes:L('gigantes'), certeiro:L('certeiro'), fury:fury>1};
 }
 const xpNeed=l=>Math.round(10*Math.pow(1.2,l-1));
@@ -463,7 +465,7 @@ const BONUS_ART={"cora": "data:image/webp;base64,UklGRmwpAABXRUJQVlA4WAoAAAAQAAA
 function bonusTex(k){return bTex[k]||(bTex[k]=new THREE.TextureLoader().load(BONUS_ART[k]));}
 const BON={cora:{col:0xe2574c,n:'+1 coração'},ouro:{col:0xe8b14a,n:'+gold'},flecha:{col:0xfff1a0,n:'Tiro triplo!'},relogio:{col:0x5aa2e8,n:'Inimigos lentos!'}};
 // Moeda rara: 0,819% de chance a cada bônus que aparece. Dá +1 vaga de carta só nesta fase. Arte desenhada no código.
-const RARE_CHANCE=.00819; let testRare=false;
+const RARE_CHANCE=.00819; let testRare=false, testMina=false;
 BON.vaga={col:0xb46cff,n:'Moeda rara: +1 vaga de carta nesta fase!'};
 bTex.vaga=canvasTex(160,160,(x,w,h)=>{const c=80;
   const gl=x.createRadialGradient(c,c,40,c,c,79);gl.addColorStop(0,'rgba(214,160,255,.6)');gl.addColorStop(1,'rgba(214,160,255,0)');x.fillStyle=gl;x.beginPath();x.arc(c,c,79,0,7);x.fill();
@@ -664,7 +666,7 @@ function armsEv(L){const own=(S.ev&&S.ev.own)||[],eq=evEquipped(),bi=Math.max(..
     b.onclick=()=>{S.ev.eq=id;S.baseWeapon=bi;S.weapon=bi;showArms();};L.appendChild(b);}}
 
 // ---------- partida ----------
-function clearWorld(){ if(!run) return; [...run.en,...run.ar,...run.bo,...run.fx,...(run.deco||[])].forEach(o=>scene.remove(o.m)); for(const e of run.en)if(e.bg)scene.remove(e.bg,e.fg); }
+function clearWorld(){ if(!run) return; [...run.en,...run.ar,...run.bo,...run.fx,...(run.deco||[])].forEach(o=>scene.remove(o.m)); for(const e of run.en)if(e.bg)scene.remove(e.bg,e.fg); for(const o of run.mines||[])scene.remove(o.m,o.gl); }
 // Fase Difícil: 1 fase surpresa por mapa (a cada 5 fases), sorteada e obrigatória. Só se descobre ao entrar.
 // Inimigos bem mais fortes, rápidos e numerosos; gold x3 e prêmio grande.
 let HARD=false;
@@ -681,6 +683,7 @@ function startPhase(keep){
   const pend=keep&&run?run.pendingLv:0;
   clearWorld();
   resetPhaseStuff();
+  if(testMina&&location.hash==='#teste')S.cards.minas=1; // teste: já começa com Minas terrestres
   snap=clone(S);
   const st=stats();
   run={t:0,wave:1,toSpawn:waveCount(1),spawnT:0,waveGap:0,boss:null,bossSpawned:false,en:[],ar:[],bo:[],fx:[],
@@ -806,6 +809,37 @@ function loseHeart(){
 }
 // Gold ganho na fase (inimigos, bônus). Se perder ou sair, fica com 50% dele.
 function addGold(v){S.gold+=v;if(run)run.earned=(run.earned||0)+v;}
+// ---------- Minas terrestres (carta, ideia do Arteco 2026-11-27) ----------
+// A cada 15 s uma mina sai da terra em qualquer lugar do mapa e fica esperando, com a luz vermelha piscando.
+// Inimigo que anda no chão e pisa nela faz explodir: todos numa área pequena perdem 19,08% da vida máxima (chefe também).
+// Voadores passam por cima sem ativar, mas levam o dano se estiverem na área na hora da explosão. No máximo 8 minas no chão.
+const MINA={every:15,pct:.1908,r:1.5,max:8,size:1.5};
+const mineTex=canvasTex(128,128,(x)=>{x.lineJoin='round';x.strokeStyle='#1c120c';
+  x.fillStyle='#7a5a36';x.beginPath();x.ellipse(64,74,58,30,0,0,7);x.fill();x.lineWidth=4;x.stroke(); // terra mexida
+  x.fillStyle='rgba(0,0,0,.2)';for(const [px,py,r] of [[24,76,5],[102,70,6],[40,92,4],[90,92,5]]){x.beginPath();x.arc(px,py,r,0,7);x.fill();}
+  const g=x.createRadialGradient(54,52,4,64,64,40);g.addColorStop(0,'#c3cace');g.addColorStop(1,'#4a5258');
+  x.fillStyle=g;x.beginPath();x.ellipse(64,64,40,26,0,0,7);x.fill();x.lineWidth=6;x.stroke(); // corpo de metal
+  x.fillStyle='#6a7378';x.beginPath();x.ellipse(64,58,22,13,0,0,7);x.fill();x.lineWidth=4;x.stroke();
+  x.fillStyle='#2a2f33';for(const [px,py] of [[32,66],[96,66],[64,85],[64,43]]){x.beginPath();x.arc(px,py,3.5,0,7);x.fill();}
+  x.fillStyle='#e2453a';x.beginPath();x.arc(64,56,7,0,7);x.fill();x.lineWidth=3;x.stroke(); // botão vermelho
+  x.fillStyle='rgba(255,255,255,.75)';x.beginPath();x.arc(61.5,53.5,2.2,0,7);x.fill();});
+function spawnMine(){const top=Math.min(SPAWNZ-4,cam.position.z+cam.top-6),x=(Math.random()*2-1)*(HALF-.3),z=PZ+2.5+Math.random()*(top-PZ-2.5);
+  const m=mkSprite(mineTex,.01,.01,.22);m.position.x=x;m.position.z=z;m.material.depthWrite=false;scene.add(m);
+  const gl=mkSprite(puffTex,.9,.9,.26);gl.material.color.setHex(0xff3a2a);gl.material.depthWrite=false;gl.material.opacity=0;gl.position.set(x,.26,z+.1);scene.add(gl);
+  run.mines=run.mines||[];run.mines.push({m,gl,t:0});burst(m.position,0x8a6a40,6,3,.5);
+  if(run.mines.length>MINA.max){const o=run.mines.shift();scene.remove(o.m,o.gl);burst(o.m.position,0x9a9a9a,5,2,.5);}} // a mais velha some
+function boomMine(mn){const p=mn.m.position;scene.remove(mn.m,mn.gl);run.mines.splice(run.mines.indexOf(mn),1);
+  for(const e of run.en){const q=e.m.position;if((q.x-p.x)**2+(q.z-p.z)**2<(MINA.r+e.r*.5)**2){const d=e.max*MINA.pct;hurt(e,d);dmgNum(q,d,true);}}
+  const q=p.clone();q.y=1.5;
+  fxSprite(puffTex,q,1,0xff9a3a,.38,(f)=>{const k=1-Math.max(0,f.life/f.max),z=MINA.r*2*(.5+1.1*Math.sqrt(k));f.m.scale.set(z,z,1);f.m.material.opacity=k<.35?1:1-(k-.35)/.65;});
+  fxSprite(puffTex,q,1,0xfff4c8,.16,(f)=>{const k=1-Math.max(0,f.life/f.max),z=MINA.r*(1+1.2*k);f.m.scale.set(z,z,1);f.m.material.opacity=1-k;});
+  ringFx(p.clone(),0xffc060,1,MINA.r*2.6,.35);burst(p,0xff8a3a,14,7,1);burst(p,0x5a4e44,10,3,1.3);shake(.35);sfx('mina');}
+function stepMines(dt){if(!run.mines||!run.mines.length)return;
+  for(const mn of [...run.mines]){mn.t+=dt;const g=mn.t<.35?Math.max(.01,backOut(mn.t/.35)):1;mn.m.scale.set(MINA.size*g,MINA.size*g,1);
+    mn.gl.material.opacity=mn.t<.35?0:.25+.75*Math.max(0,Math.sin(mn.t*9)); // luz vermelha piscando
+    if(mn.t<.35)continue; // ainda saindo da terra
+    const p=mn.m.position;for(const e of run.en){if(e.T.fly||e.hp<=0)continue;const q=e.m.position;if((q.x-p.x)**2+(q.z-p.z)**2<(e.r+.45)**2){boomMine(mn);break;}}}}
+$('tMina').onclick=()=>{testMina=!testMina;$('tMina').textContent='Minas: '+(testMina?'começa com a carta':'normal');};
 // ---------- Missões diárias ----------
 // 3 missões sorteadas por dia (mesmo sorteio o dia todo). Progresso conta em todas as partidas, até nas que você perde.
 // Completar as 3 libera o Baú do dia; fazer isso em dias seguidos aumenta a sequência e o baú.
@@ -1240,6 +1274,9 @@ function step(dt){
       else if(st.muralha&&(run.wallUsed||0)<st.muralha){run.wallUsed=(run.wallUsed||0)+1;toast('Muralha reforçada segurou!');burst(p,0xd9c3a0,10,5,.7);ringFx(p.clone(),0xd9c3a0,.8,3,.3);shake(.3);continue;}
       loseHeart(); if(run.done)return;}
   }
+  // Minas terrestres (carta): a primeira sai logo, depois uma a cada 15 s
+  if(st.minas){run.mineT=(run.mineT??3)-dt;if(run.mineT<=0){run.mineT=MINA.every;spawnMine();}}
+  stepMines(dt);
   // bônus
   run.bonT-=dt; if(run.bonT<=0){run.bonT=(6+Math.random()*4)/(1+st.bonus);const k=Math.random()<(testRare?.5:RARE_CHANCE)?'vaga':Object.keys(BON)[Math.random()*4|0];
     if(k==='vaga'){toast('Uma moeda rara apareceu!');sfx('level');}
@@ -1405,7 +1442,7 @@ $('heroImg').src=archerCanvas('front',PAL_MAIN).toDataURL();
 // ---------- Atualização automática ----------
 // No site, cada publicação grava version.json com a versão nova. O jogo confere a cada minuto e quando você volta para a aba.
 // Se tiver versão nova, recarrega sozinho quando estiver no menu (nunca no meio da fase). O progresso fica salvo.
-const BUILD='c9e8d8d635',BUILD_DATE='26/11 19:34'; // trocados na hora de publicar no site
+const BUILD='777d9f6ade',BUILD_DATE='26/11 21:04'; // trocados na hora de publicar no site
 let updWant=null,updGoing=false;
 function menuLivre(){const semJanela=['mCards','mAttr','mQuit','mJourney','mDaily','mEvent','mArms','mPause','mMsg'].every(id=>$(id).hidden);
   if(run&&run.fl)return semJanela&&$('mStart').hidden; // na Floresta pode: tudo fica salvo a cada árvore, e o jogo volta direto para ela
